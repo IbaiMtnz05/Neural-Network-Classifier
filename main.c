@@ -5,9 +5,11 @@
 #include <stdlib.h> // atoi
 #include <string.h> // strtok
 #include <sys/wait.h>
+#include <errno.h>
 #define stacksize 1048576
 
 // descargar biases.csv y weights
+    // hecho, biases y wiethgts descargados 
 // fgetc para leer de ya abiertos ficheros
 // strtok para separar strings
 
@@ -43,11 +45,23 @@ int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
 
     char *buffer; // Esto contendrá toda la fila
     char *record;  //Esto contendrá las columnas de la fila
-    FILE *fstream = fopen(file, "r");
+    FILE *fstream = fopen(biases3_3.csv, "r");   //file reemplazar por nombre (biases3_3)
     double aux;
     // Hay que hacer control de errores
+        int control_errores(){
+        FILE *f = fopen(biases3_3.csv, "r");  //file x nombre 
+        if(f==NULL){
+            printf("errno: %d\n", errno);
+            printf("Error: %s\n", strerror(errno));
+            perror("Houston, tenemos un problema");
+        }
+        else
+            printf("No tenemos problemas\n");
+            
+    }
     for (int row = 0; row < nrows; row++) {
-	// Leer, separar, y reservar columnas de la fila
+    // Leer, separar, y reservar columnas de la fila
+        // 
         for (int column = 0; column < ncols; column++) {
             if (record) {
                 aux = strtod(record, NULL) * (float)fac;
@@ -56,9 +70,13 @@ int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
                 mat[row][column] = -1.0;
             }
             // Siguiente Token
+            char* token = strtok(str, " ")
         }
     }
     // Hay que cerrar ficheros y liberar memoria
+    FILE *f = fclose(biases3_3.csv, “r”); 		//cerrar
+     // Unload_data ya lo hace, se puede poner eso y ya.
+    unload_data();
     return 0;
 }
 
@@ -69,18 +87,32 @@ int read_vector(double *vect, char *file, int nrows) {
      * el fichero con nombre file
      */
     char *buffer = // Esto contendrá el valor
-    FILE *fstream = fopen(file, "r");
+    FILE *fstream = fopen(weights3_3.csv, "r");
     double aux;
     // Control de errores
+    int control_errores(){
+        FILE *f = fopen(weights3_3.csv, "r");  //file x nombre 
+        if(f==NULL){
+            printf("errno: %d\n", errno);
+            printf("Error: %s\n", strerror(errno));
+            perror("Houston, tenemos un problema");
+        }
+        else
+            printf("No tenemos problemas\n");
+            
+    }
     for (int row = 0; row < nrows; row++) {
         // leer el valor
         aux = strtod(buffer, NULL);
         vect[row] = aux;
     }
     // Hay que cerrar ficheros y liberar memoria
+        // Unload_data ya lo hace, se puede poner eso y ya.
+    unload_data();
+    FILE *f = fclose(weights3_3.csv, “r”); 		//cerrar pero 
+
     return 0;
 }
-
 
 void print_matrix(double **mat, int nrows, int ncols, int offset_row,
                   int offset_col) {
@@ -96,7 +128,6 @@ void print_matrix(double **mat, int nrows, int ncols, int offset_row,
         printf("\n");
     }
 }
-
 
 void load_data(char *path) {
 
@@ -114,7 +145,6 @@ void load_data(char *path) {
     mat1 = malloc(matrices_rows[0] * sizeof(*mat1));
     sprintf(str, "%sparameters/weights%d_%d.csv", path, 0, seed);
     read_matrix(mat1, str, matrices_rows[0], matrices_columns[0], 1);
-
 
     // Los vectores
     vec1 = malloc(vector_rows[0] * sizeof(double));
@@ -141,7 +171,6 @@ void unload_data() {
 }
 
 
-
 void print(void *arg) { printf("Hola, soy %d\n", *(int *)arg); }
 
 int main(int argc, char *argv[]) {
@@ -162,4 +191,5 @@ int main(int argc, char *argv[]) {
     unload_data();
     return 0;
 }
+
 
