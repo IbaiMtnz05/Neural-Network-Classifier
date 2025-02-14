@@ -5,7 +5,7 @@
 #include <stdlib.h> // atoi
 #include <string.h> // strtok
 #include <sys/wait.h>
-#include <errno.h>
+#include <errno.h> //control de errores
 #define stacksize 1048576
 
 // descargar biases.csv y weights
@@ -16,7 +16,7 @@
 static double **data;
 int data_nrows;
 int data_ncols = 784;
-char *my_path = "/home/penguin/IRCSO/Practica5/files"; // tendréis que poner vuestro path
+char *my_path = "/home/me/IRCSO/Practica5/files"; // tendréis que poner vuestro path
 
 int seed = 0;
 int matrices_rows[4] = {784, 200, 100, 50};
@@ -35,6 +35,21 @@ static double *vec2;
 static double *vec3;
 static double *vec4;
 
+/*
+void siguiente_token (){
+    char* token = strtok(buffer, " ");
+    while (token!=NULL){
+        vector(column++) = strtod(token, NULL);
+        token = strtok(NULL, " ")
+    }
+}
+*/
+
+// Función global para tokenizar la línea
+char *siguiente_token(char *buffer) {
+    return strtok(buffer," "); // Divide por espacio, coma o salto de línea
+}
+
 int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
     /*
      * Dada una matrix (mat), un nombre de fichero (file), una cantidad de filas
@@ -45,23 +60,13 @@ int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
 
     char *buffer; // Esto contendrá toda la fila
     char *record;  //Esto contendrá las columnas de la fila
-    FILE *fstream = fopen(biases3_3.csv, "r");   //file reemplazar por nombre (biases3_3)
+    FILE *fstream = fopen(file, "r");   //file reemplazar por nombre (biases3_3)
     double aux;
-    // Hay que hacer control de errores
-        int control_errores(){
-        FILE *f = fopen(biases3_3.csv, "r");  //file x nombre 
-        if(f==NULL){
-            printf("errno: %d\n", errno);
-            printf("Error: %s\n", strerror(errno));
-            perror("Houston, tenemos un problema");
-        }
-        else
-            printf("No tenemos problemas\n");
-            
-    }
+    control_errores(file); // Control de errores
+    
     for (int row = 0; row < nrows; row++) {
     // Leer, separar, y reservar columnas de la fila
-        // 
+    record = siguiente_token(buffer);  // Obtener el primer token de la fila
         for (int column = 0; column < ncols; column++) {
             if (record) {
                 aux = strtod(record, NULL) * (float)fac;
@@ -70,14 +75,14 @@ int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
                 mat[row][column] = -1.0;
             }
             // Siguiente Token
-            char* token = strtok(str, " ")
-        }
+            record = siguiente_token(NULL); // Obtener siguiente token
+        } 
     }
+    
     // Hay que cerrar ficheros y liberar memoria
-    FILE *f = fclose(biases3_3.csv, “r”); 		//cerrar
-     // Unload_data ya lo hace, se puede poner eso y ya.
-    unload_data();
-    return 0;
+    fclose(fstream); 		//cerrar
+    free();
+    return (0);
 }
 
 int read_vector(double *vect, char *file, int nrows) {
@@ -87,20 +92,11 @@ int read_vector(double *vect, char *file, int nrows) {
      * el fichero con nombre file
      */
     char *buffer = // Esto contendrá el valor
-    FILE *fstream = fopen(weights3_3.csv, "r");
+    FILE *fstream = fopen(file, "r");
     double aux;
     // Control de errores
-    int control_errores(){
-        FILE *f = fopen(weights3_3.csv, "r");  //file x nombre 
-        if(f==NULL){
-            printf("errno: %d\n", errno);
-            printf("Error: %s\n", strerror(errno));
-            perror("Houston, tenemos un problema");
-        }
-        else
-            printf("No tenemos problemas\n");
-            
-    }
+    control_errores(file);
+        
     for (int row = 0; row < nrows; row++) {
         // leer el valor
         aux = strtod(buffer, NULL);
@@ -109,7 +105,7 @@ int read_vector(double *vect, char *file, int nrows) {
     // Hay que cerrar ficheros y liberar memoria
         // Unload_data ya lo hace, se puede poner eso y ya.
     unload_data();
-    FILE *f = fclose(weights3_3.csv, “r”); 		//cerrar pero 
+    fclose(fstream); 		//cerrar pero 
 
     return 0;
 }
@@ -192,4 +188,17 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-
+int control_errores(const char *checkFile) {
+    FILE *f = fopen(checkFile, "r");
+    
+    if (f == NULL) {
+        printf("errno: %d\n", errno);
+        printf("Error: %s\n", strerror(errno));
+        perror("Houston, tenemos un problema");
+        return 1; // Indica error
+    }
+    
+    printf("No tenemos problemas con el archivo: %s\n", checkFile);
+    fclose(f); // Cerrar el archivo si se abrió correctamente
+    return 0; // Indica que no hubo error
+}
