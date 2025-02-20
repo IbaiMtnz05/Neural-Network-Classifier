@@ -5,198 +5,214 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
-#include <errno.h>
-#define stacksize 1048576
 
-static double **data;
-int data_nrows = 60000; // Fixed number of rows for data.csv
-int data_ncols = 784;
-char *my_path = "/workspaces/Trabajo5";
+// Estructura para matrices dinámicas
+typedef struct {
+    int rows;
+    int cols;
+    double **data;
+} DynamicMatrix;
 
-int seed = 0;
-int matrices_rows[4] = {784, 200, 100, 50};
-int matrices_columns[4] = {200, 100, 50, 10};
-int vector_rows[4] = {200, 100, 50, 10};
+// Estructura para vectores dinámicos
+typedef struct {
+    int size;
+    double *data;
+} DynamicVector;
 
-static double *digits;
-static double **mat1;
-static double **mat2;
-static double **mat3;
-static double **mat4;
-static double *vec1;
-static double *vec2;
-static double *vec3;
-static double *vec4;
+// Funciones para matrices dinámicas
+DynamicMatrix* createMatrix(int rows, int cols) {
+    DynamicMatrix* matrix = malloc(sizeof(DynamicMatrix));
+    matrix->rows = rows;
+    matrix->cols = cols;
+    
+    // Asignar memoria para filas
+    matrix->data = malloc(rows * sizeof(double*));
+    
+    // Asignar memoria para columnas en cada fila
+    for (int i = 0; i < rows; i++) {
+        matrix->data[i] = malloc(cols * sizeof(double));
+        // Inicializar a cero (opcional)
+        memset(matrix->data[i], 0, cols * sizeof(double));
+    }
+    
+    return matrix;
+}
 
-int read_matrix(double **mat, char *file, int nrows, int ncols, int fac);
-int read_vector(double *vect, char *file, int nrows);
-void print_matrix(double **mat, int nrows, int ncols, int offset_row, int offset_col);
-void load_data(char *path);
-void unload_data();
-int control_errores(const char *checkFile);
+void freeMatrix(DynamicMatrix* matrix) {
+    if (!matrix) return;
+    
+    // Liberar cada fila
+    for (int i = 0; i < matrix->rows; i++) {
+        free(matrix->data[i]);
+    }
+    
+    // Liberar el array de punteros a filas
+    free(matrix->data);
+    
+    // Liberar la estructura
+    free(matrix);
+}
 
-int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
-    FILE *fstream = fopen(file, "r");
-    if (fstream == NULL) {
-        perror("Error opening file");
+// Funciones para vectores dinámicos
+DynamicVector* createVector(int size) {
+    DynamicVector* vector = malloc(sizeof(DynamicVector));
+    vector->size = size;
+    vector->data = malloc(size * sizeof(double));
+    
+    // Inicializar a cero (opcional)
+    memset(vector->data, 0, size * sizeof(double));
+    
+    return vector;
+}
+
+void freeVector(DynamicVector* vector) {
+    if (!vector) return;
+    free(vector->data);
+    free(vector);
+}
+
+// Función para leer una matriz desde un archivo
+int readMatrix(DynamicMatrix* matrix, const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Error al abrir el archivo %s\n", filename);
         return -1;
     }
-
-    char buffer[1024];
-    int row = 0;
-    while (row < nrows && fgets(buffer, sizeof(buffer), fstream) != NULL) {
-        buffer[strcspn(buffer, "\n")] = '\0'; // Remove newline
-        char *token = strtok(buffer, ",");
-        int col = 0;
-        while (token != NULL && col < ncols) {
-            mat[row][col] = strtod(token, NULL) * fac;
-            token = strtok(NULL, ",");
-            col++;
-        }
-        if (col != ncols) {
-            fprintf(stderr, "Error: Invalid columns in row %d of %s\n", row, file);
-            fclose(fstream);
+    
+    char* line = NULL;
+    size_t len = 0;
+    ssize_t read;
+    
+    for (int row = 0; row < matrix->rows; row++) {
+        if ((read = getline(&line, &len, file)) == -1) {
+            fprintf(stderr, "Error: archivo con menos filas de las esperadas\n");
+            free(line);
+            fclose(file);
             return -1;
         }
-        row++;
+        
+        char* token = strtok(line, " ,\n");
+        for (int col = 0; col < matrix->cols; col++) {
+            if (token) {
+                matrix->data[row][col] = strtod(token, NULL);
+                token = strtok(NULL, " ,\n");
+            } else {
+                matrix->data[row][col] = 0.0;
+            }
+        }
     }
-    fclose(fstream);
+    
+    free(line);
+    fclose(file);
     return 0;
 }
 
-int read_vector(double *vect, char *file, int nrows) {
-    FILE *fstream = fopen(file, "r");
-    if (fstream == NULL) {
-        perror("Error opening file");
+// Función para leer un vector desde un archivo
+int readVector(DynamicVector* vector, const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Error al abrir el archivo %s\n", filename);
         return -1;
     }
-
-    char buffer[1024];
-    int row = 0;
-    while (row < nrows && fgets(buffer, sizeof(buffer), fstream) != NULL) {
-        buffer[strcspn(buffer, "\n")] = '\0';
-        vect[row] = strtod(buffer, NULL);
-        row++;
+    
+    char* line = NULL;
+    size_t len = 0;
+    
+    for (int i = 0; i < vector->size; i++) {
+        if (getline(&line, &len, file) != -1) {
+            vector->data[i] = strtod(line, NULL);
+        } else {
+            vector->data[i] = 0.0;
+        }
     }
-    fclose(fstream);
+    
+    free(line);
+    fclose(file);
     return 0;
 }
 
-void load_data(char *path) {
-    char *str = malloc(256 * sizeof(char));
-    if (str == NULL) {
-        perror("Failed to allocate path buffer");
-        exit(EXIT_FAILURE);
+// Función para imprimir una matriz
+void printMatrix(DynamicMatrix* matrix, int max_rows, int max_cols) {
+    int rows = (max_rows > 0 && max_rows < matrix->rows) ? max_rows : matrix->rows;
+    int cols = (max_cols > 0 && max_cols < matrix->cols) ? max_cols : matrix->cols;
+    
+    printf("Matriz %dx%d (mostrando %dx%d):\n", matrix->rows, matrix->cols, rows, cols);
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            printf("%8.4f ", matrix->data[i][j]);
+        }
+        printf("\n");
     }
-
-    // Load data matrix (data.csv)
-    data = malloc(data_nrows * sizeof(double *));
-    for (int i = 0; i < data_nrows; i++) {
-        data[i] = malloc(data_ncols * sizeof(double));
-    }
-    snprintf(str, 256, "%s/csvs/data.csv", path);
-    read_matrix(data, str, data_nrows, data_ncols, 1);
-
-    // Load digits vector (digits.csv)
-    digits = malloc(data_nrows * sizeof(double));
-    snprintf(str, 256, "%s/csvs/digits.csv", path);
-    read_vector(digits, str, data_nrows);
-
-    // Load layer 0 weights and biases
-    mat1 = malloc(matrices_rows[0] * sizeof(double *));
-    for (int i = 0; i < matrices_rows[0]; i++) {
-        mat1[i] = malloc(matrices_columns[0] * sizeof(double));
-    }
-    snprintf(str, 256, "%s/parameters/weights0_%d.csv", path, seed);
-    read_matrix(mat1, str, matrices_rows[0], matrices_columns[0], 1);
-
-    vec1 = malloc(vector_rows[0] * sizeof(double));
-    snprintf(str, 256, "%s/parameters/biases0_%d.csv", path, seed);
-    read_vector(vec1, str, vector_rows[0]);
-
-    // Load layer 1 weights and biases
-    mat2 = malloc(matrices_rows[1] * sizeof(double *));
-    for (int i = 0; i < matrices_rows[1]; i++) {
-        mat2[i] = malloc(matrices_columns[1] * sizeof(double));
-    }
-    snprintf(str, 256, "%s/parameters/weights1_%d.csv", path, seed);
-    read_matrix(mat2, str, matrices_rows[1], matrices_columns[1], 1);
-
-    vec2 = malloc(vector_rows[1] * sizeof(double));
-    snprintf(str, 256, "%s/parameters/biases1_%d.csv", path, seed);
-    read_vector(vec2, str, vector_rows[1]);
-
-    // Load layer 2 weights and biases
-    mat3 = malloc(matrices_rows[2] * sizeof(double *));
-    for (int i = 0; i < matrices_rows[2]; i++) {
-        mat3[i] = malloc(matrices_columns[2] * sizeof(double));
-    }
-    snprintf(str, 256, "%s/parameters/weights2_%d.csv", path, seed);
-    read_matrix(mat3, str, matrices_rows[2], matrices_columns[2], 1);
-
-    vec3 = malloc(vector_rows[2] * sizeof(double));
-    snprintf(str, 256, "%s/parameters/biases2_%d.csv", path, seed);
-    read_vector(vec3, str, vector_rows[2]);
-
-    // Load layer 3 weights and biases
-    mat4 = malloc(matrices_rows[3] * sizeof(double *));
-    for (int i = 0; i < matrices_rows[3]; i++) {
-        mat4[i] = malloc(matrices_columns[3] * sizeof(double));
-    }
-    snprintf(str, 256, "%s/parameters/weights3_%d.csv", path, seed);
-    read_matrix(mat4, str, matrices_rows[3], matrices_columns[3], 1);
-
-    vec4 = malloc(vector_rows[3] * sizeof(double));
-    snprintf(str, 256, "%s/parameters/biases3_%d.csv", path, seed);
-    read_vector(vec4, str, vector_rows[3]);
-
-    free(str);
 }
 
-void unload_data() {
-    free(digits);
-    for (int i = 0; i < data_nrows; i++) free(data[i]);
-    free(data);
-
-    for (int i = 0; i < matrices_rows[0]; i++) free(mat1[i]);
-    free(mat1);
-    for (int i = 0; i < matrices_rows[1]; i++) free(mat2[i]);
-    free(mat2);
-    for (int i = 0; i < matrices_rows[2]; i++) free(mat3[i]);
-    free(mat3);
-    for (int i = 0; i < matrices_rows[3]; i++) free(mat4[i]);
-    free(mat4);
-
-    free(vec1);
-    free(vec2);
-    free(vec3);
-    free(vec4);
-}
-
-int control_errores(const char *checkFile) {
-    FILE *f = fopen(checkFile, "r");
-    if (f == NULL) {
-        perror("Error al abrir el archivo");
-        return 1;
-    }
-    fclose(f);
-    return 0;
-}
-
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("Uso: %s <num_procesos>\n", argv[0]);
-        exit(1);
-    }
-
-    load_data(my_path);
-    // Ejemplo de impresión para verificación
-    printf("Primeros 5 elementos de la primera fila de data:\n");
-    for (int i = 0; i < 5; i++) {
-        printf("%f ", data[0][i]);
+// Función para imprimir un vector
+void printVector(DynamicVector* vector, int max_size) {
+    int size = (max_size > 0 && max_size < vector->size) ? max_size : vector->size;
+    
+    printf("Vector de tamaño %d (mostrando %d elementos):\n", vector->size, size);
+    for (int i = 0; i < size; i++) {
+        printf("%8.4f ", vector->data[i]);
+        if ((i + 1) % 10 == 0) printf("\n");
     }
     printf("\n");
+}
 
-    unload_data();
+// Ejemplo de uso en la función principal
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        printf("Uso: %s <num_procesos>\n", argv[0]);
+        return 1;
+    }
+    
+    int num_procesos = atoi(argv[1]);
+    if (num_procesos <= 0) {
+        printf("El número de procesos debe ser positivo\n");
+        return 1;
+    }
+    
+    // Definir dimensiones
+    int data_nrows = 60000;  // Número de imágenes
+    int data_ncols = 784;    // 28x28 pixels
+    
+    // Crear la matriz de datos
+    DynamicMatrix* data = createMatrix(data_nrows, data_ncols);
+    
+    // Crear los parámetros del modelo
+    int matrices_rows[4] = {784, 200, 100, 50};
+    int matrices_columns[4] = {200, 100, 50, 10};
+    
+    // Crear matrices de pesos
+    DynamicMatrix* weights[4];
+    for (int i = 0; i < 4; i++) {
+        weights[i] = createMatrix(matrices_rows[i], matrices_columns[i]);
+    }
+    
+    // Crear vectores de bias
+    DynamicVector* biases[4];
+    for (int i = 0; i < 4; i++) {
+        biases[i] = createVector(matrices_columns[i]);
+    }
+    
+    // Vector para almacenar los dígitos reales
+    DynamicVector* digits = createVector(data_nrows);
+    
+    // TODO: Cargar datos desde archivos
+    char path[256] = "/workspaces/Trabajo5";  // Ajustar según sea necesario
+    char filename[512];
+    
+    // Ejemplo de carga (ajustar rutas según tu estructura)
+    sprintf(filename, "%s/csvs/data.csv", path);
+    if (readMatrix(data, filename) == 0) {
+        printMatrix(data, 60000, 784);  // Mostrar solo primeras 2 filas, 20 columnas
+    }
+    
+    // Liberar memoria
+    freeVector(digits);
+    for (int i = 0; i < 4; i++) {
+        freeMatrix(weights[i]);
+        freeVector(biases[i]);
+    }
+    freeMatrix(data);
+    
     return 0;
 }
