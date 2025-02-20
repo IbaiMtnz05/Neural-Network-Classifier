@@ -16,7 +16,7 @@
 static double **data;
 int data_nrows;
 int data_ncols = 784;
-char *my_path = "/home/me/IRCSO/Practica5/files"; // tendréis que poner vuestro path
+char *my_path = "/workspaces/Trabajo5"; // tendréis que poner vuestro path
 
 int seed = 0;
 int matrices_rows[4] = {784, 200, 100, 50};
@@ -81,7 +81,8 @@ int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
     
     // Hay que cerrar ficheros y liberar memoria
     fclose(fstream); 		//cerrar
-    free();
+    free(buffer);
+    free(record);
     return (0);
 }
 
@@ -91,7 +92,7 @@ int read_vector(double *vect, char *file, int nrows) {
      * (nrows), deja en vect el vector (de dimensión nrows) de datos contenido en
      * el fichero con nombre file
      */
-    char *buffer = // Esto contendrá el valor
+    char *buffer;// = // Esto contendrá el valor
     FILE *fstream = fopen(file, "r");
     double aux;
     // Control de errores
@@ -104,8 +105,9 @@ int read_vector(double *vect, char *file, int nrows) {
     }
     // Hay que cerrar ficheros y liberar memoria
         // Unload_data ya lo hace, se puede poner eso y ya.
-    unload_data();
-    fclose(fstream); 		//cerrar pero 
+    fclose(fstream); 		//cerrar 
+    free(buffer);
+    free(fstream);
 
     return 0;
 }
