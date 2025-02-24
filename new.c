@@ -25,7 +25,7 @@ char *siguiente_token(char *buffer);
 
 // Global variables
 static double **data;
-int data_nrows;
+int data_nrows;// = 60000;
 int data_ncols = 784;
 char *my_path = "/workspaces/Trabajo5/";
 
@@ -75,16 +75,18 @@ int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
     }
 
     for (int row = 0; row < nrows; row++) {
-	// Leer, separar, y reservar columnas de la fila
+        if (fgets(buffer, sizeof(buffer), fstream) == NULL) {
+            break;
+        }
+        char *record = siguiente_token(buffer);
+
         for (int column = 0; column < ncols; column++) {
             if (record) {
-                aux = strtod(record, NULL) * (float)fac;
-                mat[row][column] = aux;
+                mat[row][column] = strtod(record, NULL) * fac;
+                record = siguiente_token(NULL);
             } else {
                 mat[row][column] = -1.0;
             }
-            record = siguiente_token(buffer);
-            // Siguiente Token
         }
     }
     // Hay que cerrar ficheros y liberar memoria
@@ -124,14 +126,15 @@ int read_vector(double *vect, char *file, int nrows) {
 
 
 void print_matrix(double **mat, int nrows, int ncols, int offset_row, int offset_col) {
-    /*
-     * Dada una matriz (mat), una cantidad de filas (nrows) y columnas (ncols) a
-     * imprimir, y una cantidad de filas (offset_row) y columnas (offset_col) a
-     * ignorar, imprime por salida estándar nrows x ncols de la matriz
-     */
+    if (!mat) {
+        printf("Error: La matriz no está inicializada.\n");
+        return;
+    }
+
+    printf("\nMatriz (%d x %d) desde offset (%d, %d):\n", nrows, ncols, offset_row, offset_col);
     for (int row = 0; row < nrows; row++) {
         for (int col = 0; col < ncols; col++) {
-            printf("%f ", mat[row + offset_row][col + offset_col]);
+            printf("%8.3f ", mat[row + offset_row][col + offset_col]);
         }
         printf("\n");
     }
@@ -152,11 +155,14 @@ void load_data(char *path) {
     printf("digits cargados\n");
 
     printf("\ncargando data\n");
+    sleep(2);
     data = malloc(data_ncols * data_nrows * sizeof(double));
     sprintf(str, "%scsvs/data.csv", path);
     read_matrix(data, str, data_nrows, data_ncols, 1);
-    printf("\ndata cargada\n");
-  
+    printf("\ndata cargada");
+    printf("\nPrinteando matriz\n");
+    print_matrix(data, 5, 5, 0, 0);
+    
     // Las matrices
     printf("\ncargando mat1");
     mat1 = malloc(matrices_rows[0] * sizeof(*mat1));
