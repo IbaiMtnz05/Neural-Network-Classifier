@@ -22,8 +22,55 @@ typedef struct {
     int running;
 } Viewer;
 
+// Function prototypes
+int control_errores(const char *checkFile);
+int read_matrix(double **mat, char *file, int nrows, int ncols, int fac);
+int read_vector(double *vect, char *file, int nrows);
+void print_matrix(double **mat, int nrows, int ncols, int offset_row, int offset_col);
+void load_data(char *path);
+void unload_data(void);
+double** mat_mul(double **input, int input_rows, int input_cols, double **weights, int weight_cols);
+double** sum_vect(double **matrix, double *vector, int nrows, int ncols);
+double** relu(double **matrix, int nrows, int ncols);
+int* argmax(double **matrix, int rows, int cols);
+void free_matrix(double **matrix, int rows);
+int* forward_pass(double **data);
+char *siguiente_token(char *buffer);
+void view_mnist_images(double **data, int num_images);
+
+// Global variables
+static double **data;
+int data_nrows;       // e.g., 60000 for full MNIST (set as needed)
+int data_ncols = 784;
+char *my_path = "/home/penguin/IRCSO/Trabajo5/Trabajo5/"; // Consider using relative path or env variable
+
+int seed = 3;
+// Weight matrices dimensions (as given):
+// mat1: 784 x 200, mat2: 200 x 100, mat3: 100 x 50, mat4: 50 x 10.
+int matrices_rows[4]    = {784, 200, 100, 50};
+int matrices_columns[4] = {200, 100, 50, 10};
+// Bias vectors dimensions: match output columns of each layer.
+int vector_rows[4] = {200, 100, 50, 10};
+
+char *str;  // for building file paths
+
+static double *digits;
+static double **mat1;
+static double **mat2;
+static double **mat3;
+static double **mat4;
+static double *vec1;
+static double *vec2;
+static double *vec3;
+static double *vec4;
+
 // Función para visualizar las imágenes MNIST
 void view_mnist_images(double **data, int num_images) {
+    if (data == NULL || num_images <= 0) {
+        fprintf(stderr, "Error: Datos no válidos para visualizar\n");
+        return;
+    }
+    
     // Inicializar SDL
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "Error al inicializar SDL: %s\n", SDL_GetError());
@@ -136,47 +183,6 @@ void view_mnist_images(double **data, int num_images) {
     SDL_Quit();
 }
 
-// Function prototypes
-int control_errores(const char *checkFile);
-int read_matrix(double **mat, char *file, int nrows, int ncols, int fac);
-int read_vector(double *vect, char *file, int nrows);
-void print_matrix(double **mat, int nrows, int ncols, int offset_row, int offset_col);
-void load_data(char *path);
-void unload_data(void);
-double** mat_mul(double **input, int input_rows, int input_cols, double **weights, int weight_cols);
-double** sum_vect(double **matrix, double *vector, int nrows, int ncols);
-double** relu(double **matrix, int nrows, int ncols);
-int* argmax(double **matrix, int rows, int cols);
-void free_matrix(double **matrix, int rows);
-int* forward_pass(double **data);
-char *siguiente_token(char *buffer);
-
-// Global variables
-static double **data;
-int data_nrows;       // e.g., 60000 for full MNIST (set as needed)
-int data_ncols = 784;
-char *my_path = "/workspaces/Trabajo5/";
-
-int seed = 3;
-// Weight matrices dimensions (as given):
-// mat1: 784 x 200, mat2: 200 x 100, mat3: 100 x 50, mat4: 50 x 10.
-int matrices_rows[4]    = {784, 200, 100, 50};
-int matrices_columns[4] = {200, 100, 50, 10};
-// Bias vectors dimensions: match output columns of each layer.
-int vector_rows[4] = {200, 100, 50, 10};
-
-char *str;  // for building file paths
-
-static double *digits;
-static double **mat1;
-static double **mat2;
-static double **mat3;
-static double **mat4;
-static double *vec1;
-static double *vec2;
-static double *vec3;
-static double *vec4;
-
 // Debug
 // Print a matrix for debugging purposes.
 void debug_print_matrix(double **mat, int nrows, int ncols, const char *name) {
@@ -198,35 +204,50 @@ void debug_print_vector(double *vec, int nrows, const char *name) {
     printf("\n");
 }
 
-// Helper for tokenization using strtok.
+// Helper for tokenization - FIXED to better handle CSV parsing
 char *siguiente_token(char *buffer) {
     static char *last_ptr = NULL;
     if (buffer != NULL) {
         last_ptr = buffer;
-        return strtok(last_ptr, " ,\n");
+        return strtok(last_ptr, " ,\n\r");
     } else {
-        return strtok(NULL, " ,\n");
+        return strtok(NULL, " ,\n\r");
     }
 }
 
-// Read a CSV file into a 2D matrix.
+// Read a CSV file into a 2D matrix - FIXED to handle different CSV formats
 int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
     printf("\nRead matrix from file: %s\n", file);
-    char buffer[1024];
+    char buffer[1024 * 10]; // Increased buffer size for larger lines
     FILE *fstream = fopen(file, "r");
-    if (control_errores(file) != 0) {
+    if (fstream == NULL || control_errores(file) != 0) {
+        printf("Error opening file: %s\n", file);
         return 1;
     }
+    
     for (int row = 0; row < nrows; row++) {
-        if (fgets(buffer, sizeof(buffer), fstream) == NULL)
+        if (fgets(buffer, sizeof(buffer), fstream) == NULL) {
+            printf("Warning: Reached end of file at row %d/%d\n", row, nrows);
             break;
+        }
+        
+        // Remove any trailing newline or carriage return
+        size_t len = strlen(buffer);
+        if (len > 0 && (buffer[len-1] == '\n' || buffer[len-1] == '\r')) {
+            buffer[len-1] = '\0';
+            if (len > 1 && buffer[len-2] == '\r') {
+                buffer[len-2] = '\0';
+            }
+        }
+        
         char *token = siguiente_token(buffer);
         for (int col = 0; col < ncols; col++) {
             if (token) {
                 mat[row][col] = strtod(token, NULL) * fac;
                 token = siguiente_token(NULL);
             } else {
-                mat[row][col] = -1.0;
+                printf("Warning: Missing value at row %d, col %d\n", row, col);
+                mat[row][col] = 0.0; // Use 0 instead of -1 for missing values
             }
         }
     }
@@ -234,19 +255,36 @@ int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
     return 0;
 }
 
-// Read a CSV file into a vector.
+// Read a CSV file into a vector - FIXED to handle different CSV formats
 int read_vector(double *vect, char *file, int nrows) {
     printf("\nRead vector from file: %s\n", file);
     FILE *fstream = fopen(file, "r");
-    if (control_errores(file) != 0) {
+    if (fstream == NULL || control_errores(file) != 0) {
+        printf("Error opening file: %s\n", file);
         return 1;
     }
+    
     char buffer[1024];
     for (int i = 0; i < nrows; i++) {
-        if (fgets(buffer, sizeof(buffer), fstream) != NULL)
-            vect[i] = strtod(buffer, NULL);
-        else
-            vect[i] = 0.0;
+        if (fgets(buffer, sizeof(buffer), fstream) == NULL) {
+            printf("Warning: Reached end of file at row %d/%d\n", i, nrows);
+            break;
+        }
+        
+        // Remove newline and carriage return
+        size_t len = strlen(buffer);
+        if (len > 0 && (buffer[len-1] == '\n' || buffer[len-1] == '\r')) {
+            buffer[len-1] = '\0';
+            if (len > 1 && buffer[len-2] == '\r') {
+                buffer[len-2] = '\0';
+            }
+        }
+        
+        // Handle possible comma-separated values (take first value)
+        char *comma = strchr(buffer, ',');
+        if (comma) *comma = '\0';
+        
+        vect[i] = strtod(buffer, NULL);
     }
     fclose(fstream);
     return 0;
@@ -266,28 +304,74 @@ void print_matrix(double **mat, int nrows, int ncols, int offset_row, int offset
     }
 }
 
-// Load all data and model parameters.
+// Load all data and model parameters - FIXED to better handle file loading
 void load_data(char *path) {
     // Allocate buffer for file paths.
-    str = malloc(128);
+    str = malloc(256); // Increased buffer size for longer paths
     
     // Load digits (the ground-truth labels)
     printf("Cargando digits...\n");
     digits = malloc(data_nrows * sizeof(double));
+    if (!digits) {
+        fprintf(stderr, "Error: No se pudo asignar memoria para digits\n");
+        exit(1);
+    }
+    
+    // Initialize digits array with -1 to detect loading issues
+    for (int i = 0; i < data_nrows; i++) {
+        digits[i] = -1;
+    }
+    
     sprintf(str, "%scsvs/digits.csv", path);
-    read_vector(digits, str, data_nrows);
+    if (read_vector(digits, str, data_nrows) != 0) {
+        fprintf(stderr, "Error: No se pudieron cargar los digits\n");
+        exit(1);
+    }
     printf("Digits cargados.\n");
 
     // Allocate and load input data (as a 2D array).
     printf("Cargando data...\n");
     data = malloc(data_nrows * sizeof(double *));
+    if (!data) {
+        fprintf(stderr, "Error: No se pudo asignar memoria para data\n");
+        exit(1);
+    }
+    
     for (int i = 0; i < data_nrows; i++) {
         data[i] = malloc(data_ncols * sizeof(double));
+        if (!data[i]) {
+            fprintf(stderr, "Error: No se pudo asignar memoria para data[%d]\n", i);
+            exit(1);
+        }
+        // Initialize with zeros to detect loading issues
+        for (int j = 0; j < data_ncols; j++) {
+            data[i][j] = 0;
+        }
     }
+    
     sprintf(str, "%scsvs/data.csv", path);
-    read_matrix(data, str, data_nrows, data_ncols, 1);
+    if (read_matrix(data, str, data_nrows, data_ncols, 1) != 0) {
+        fprintf(stderr, "Error: No se pudo cargar data.csv\n");
+        exit(1);
+    }
+    
     printf("Data cargada.\n");
     print_matrix(data, 5, 5, 0, 0);
+    
+    // Check if data is loaded correctly by examining a few values
+    int has_nonzero = 0;
+    for (int i = 0; i < 5 && i < data_nrows; i++) {
+        for (int j = 0; j < 5 && j < data_ncols; j++) {
+            if (data[i][j] != 0) {
+                has_nonzero = 1;
+                break;
+            }
+        }
+        if (has_nonzero) break;
+    }
+    if (!has_nonzero) {
+        printf("Warning: La data parece contener solo ceros. Verificar el formato del archivo CSV\n");
+    }
     
     // Load weight matrices.
     // mat1: 784 x 200
@@ -295,6 +379,9 @@ void load_data(char *path) {
     mat1 = malloc(matrices_rows[0] * sizeof(double *));
     for (int i = 0; i < matrices_rows[0]; i++) {
         mat1[i] = malloc(matrices_columns[0] * sizeof(double));
+        for (int j = 0; j < matrices_columns[0]; j++) {
+            mat1[i][j] = 0;
+        }
     }
     sprintf(str, "%sparameters/weights%d_%d.csv", path, 0, seed);
     read_matrix(mat1, str, matrices_rows[0], matrices_columns[0], 1);
@@ -305,6 +392,9 @@ void load_data(char *path) {
     mat2 = malloc(matrices_rows[1] * sizeof(double *));
     for (int i = 0; i < matrices_rows[1]; i++) {
         mat2[i] = malloc(matrices_columns[1] * sizeof(double));
+        for (int j = 0; j < matrices_columns[1]; j++) {
+            mat2[i][j] = 0;
+        }
     }
     sprintf(str, "%sparameters/weights%d_%d.csv", path, 1, seed);
     read_matrix(mat2, str, matrices_rows[1], matrices_columns[1], 1);
@@ -315,6 +405,9 @@ void load_data(char *path) {
     mat3 = malloc(matrices_rows[2] * sizeof(double *));
     for (int i = 0; i < matrices_rows[2]; i++) {
         mat3[i] = malloc(matrices_columns[2] * sizeof(double));
+        for (int j = 0; j < matrices_columns[2]; j++) {
+            mat3[i][j] = 0;
+        }
     }
     sprintf(str, "%sparameters/weights%d_%d.csv", path, 2, seed);
     read_matrix(mat3, str, matrices_rows[2], matrices_columns[2], 1);
@@ -325,6 +418,9 @@ void load_data(char *path) {
     mat4 = malloc(matrices_rows[3] * sizeof(double *));
     for (int i = 0; i < matrices_rows[3]; i++) {
         mat4[i] = malloc(matrices_columns[3] * sizeof(double));
+        for (int j = 0; j < matrices_columns[3]; j++) {
+            mat4[i][j] = 0;
+        }
     }
     sprintf(str, "%sparameters/weights%d_%d.csv", path, 3, seed);
     read_matrix(mat4, str, matrices_rows[3], matrices_columns[3], 1);
@@ -333,18 +429,27 @@ void load_data(char *path) {
     // Load bias vectors.
     // vec1: dimension 200
     vec1 = malloc(vector_rows[0] * sizeof(double));
+    for (int i = 0; i < vector_rows[0]; i++) {
+        vec1[i] = 0;
+    }
     sprintf(str, "%sparameters/biases%d_%d.csv", path, 0, seed);
     read_vector(vec1, str, vector_rows[0]);
     printf("vec1 cargada.\n");
 
     // vec2: dimension 100
     vec2 = malloc(vector_rows[1] * sizeof(double));
+    for (int i = 0; i < vector_rows[1]; i++) {
+        vec2[i] = 0;
+    }
     sprintf(str, "%sparameters/biases%d_%d.csv", path, 1, seed);
     read_vector(vec2, str, vector_rows[1]);
     printf("vec2 cargada.\n");
 
     // vec3: dimension 50
     vec3 = malloc(vector_rows[2] * sizeof(double));
+    for (int i = 0; i < vector_rows[2]; i++) {
+        vec3[i] = 0;
+    }
     sprintf(str, "%sparameters/biases%d_%d.csv", path, 2, seed);
     read_vector(vec3, str, vector_rows[2]);
     printf("vec3 cargada.\n");
@@ -352,6 +457,9 @@ void load_data(char *path) {
 
     // vec4: dimension 10
     vec4 = malloc(vector_rows[3] * sizeof(double));
+    for (int i = 0; i < vector_rows[3]; i++) {
+        vec4[i] = 0;
+    }
     sprintf(str, "%sparameters/biases%d_%d.csv", path, 3, seed);
     read_vector(vec4, str, vector_rows[3]);
     printf("vec4 cargada.\n");
@@ -488,8 +596,8 @@ int* forward_pass(double **data) {
     printf("Predictions computed for %d samples\n", data_nrows);
     
     // Print first few predictions.
-    printf("\nFirst 10 predictions:\n");
-    for (int i = 0; i < 10 && i < data_nrows; i++) {
+    printf("\nFirst 100 predictions:\n");
+    for (int i = 0; i < 100 && i < data_nrows; i++) {
         printf("Sample %d: Predicted digit %d\n", i, predicciones[i]);
     }
     
@@ -518,12 +626,61 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
-    // Set the number of data rows.
-    // For full MNIST, this would be 60000. Adjust as needed.
-    data_nrows = 60000; 
+    // Use a smaller dataset size for testing if full dataset has issues
+    // For full MNIST, this would be 60000. Using smaller size for testing.
+    data_nrows = 60000; // Start with a smaller subset for testing
+    
+    // Verify path and adjust if needed
+    struct {
+        const char* path;
+        int tested;
+    } paths[] = {
+        {my_path, 0},
+        {"./", 0},
+        {"../", 0},
+        {NULL, 0}
+    };
+    
+    char test_path[256];
+    int path_found = 0;
+    
+    for (int i = 0; paths[i].path != NULL; i++) {
+        sprintf(test_path, "%scsvs/data.csv", paths[i].path);
+        FILE *test = fopen(test_path, "r");
+        if (test) {
+            fclose(test);
+            my_path = strdup(paths[i].path);
+            path_found = 1;
+            printf("Using path: %s\n", my_path);
+            break;
+        }
+    }
+    
+    if (!path_found) {
+        printf("No se ha encontrado el archivo data.csv en ninguna de las rutas probadas.\n");
+        printf("Por favor, especifique la ruta correcta en la variable 'my_path'.\n");
+        return 1;
+    }
     
     // Cargar los datos primero (necesario para visualizar)
     load_data(my_path);
+    
+    // Verifiquemos si los datos se cargaron correctamente
+    int datos_validos = 1;
+    for (int i = 0; i < 10 && i < data_nrows; i++) {
+        int zeros_count = 0;
+        for (int j = 0; j < data_ncols; j++) {
+            if (data[i][j] == 0) zeros_count++;
+        }
+        if (zeros_count == data_ncols) {
+            printf("Warning: La fila %d contiene solo ceros.\n", i);
+            datos_validos = 0;
+        }
+    }
+    
+    if (!datos_validos) {
+        printf("Warning: Posible problema con la lectura de data.csv. Revise el formato del archivo.\n");
+    }
     
     // Mostrar el visualizador de imágenes MNIST
     printf("\n=== Iniciando Visualizador de Imágenes MNIST ===\n");
@@ -537,7 +694,7 @@ int main(int argc, char *argv[]) {
     
     // Compare the first 10 predictions with the actual digits.
     printf("\nComparing first 10 predictions with actual digits:\n");
-    for (int i = 0; i < 10 && i < data_nrows; i++) {
+    for (int i = 0; i < 100 && i < data_nrows; i++) {
         printf("Sample %d: Predicted %d, Actual %.0f\n", i, predictions[i], digits[i]);
     }
     free(predictions);
