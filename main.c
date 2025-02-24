@@ -40,9 +40,9 @@ void view_mnist_images(double **data, int num_images);
 
 // Global variables
 static double **data;
-int data_nrows;       // e.g., 60000 for full MNIST (set as needed)
+int data_nrows;
 int data_ncols = 784;
-char *my_path = "/home/penguin/IRCSO/Trabajo5/Trabajo5/"; // Consider using relative path or env variable
+char *my_path = "/workspaces/Trabajo5"; // Consider using relative path or env variable
 
 int seed = 3;
 // Weight matrices dimensions (as given):
