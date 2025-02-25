@@ -620,6 +620,18 @@ int control_errores(const char *checkFile) {
     return 0;
 }
 
+double final_result(int *predictions, double *actual_digits, int num_samples) {
+    int correct_predictions = 0;
+    
+    for (int i = 0; i < num_samples; i++) {
+        if (predictions[i] == (int)actual_digits[i]) {
+            correct_predictions++;
+        }
+    }
+    
+    return (correct_predictions / (double)num_samples) * 100.0;
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         printf("El programa debe tener un único argumento, la cantidad de procesos que se van a generar\n");
@@ -693,10 +705,13 @@ int main(int argc, char *argv[]) {
     int *predictions = forward_pass(data);
     
     // Compare the first 10 predictions with the actual digits.
-    printf("\nComparing first 10 predictions with actual digits:\n");
+    printf("\nComparing first 100 predictions with actual digits:\n");
     for (int i = 0; i < 100 && i < data_nrows; i++) {
         printf("Sample %d: Predicted %d, Actual %.0f\n", i, predictions[i], digits[i]);
     }
+
+    double accuracy = final_result(predictions, digits, data_nrows);
+    printf("\nFinal Prediction Accuracy: %.2f%%\n", accuracy);
     free(predictions);
     unload_data();
     return 0;
