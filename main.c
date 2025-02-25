@@ -42,12 +42,7 @@ void view_mnist_images(double **data, int num_images);
 static double **data;
 int data_nrows;
 int data_ncols = 784;
-<<<<<<< HEAD
-char *my_path = "/workspaces/Trabajo5"; // Consider using relative path or env variable
-=======
-char *my_path = "/workspaces/Trabajo5";
->>>>>>> 07bc4c4b5b7912b01a474230d680a9087649f968
-
+char *my_path = "/workspaces/Trabajo5"; // TO DO auto detection
 int seed = 3;
 // Weight matrices dimensions (as given):
 // mat1: 784 x 200, mat2: 200 x 100, mat3: 100 x 50, mat4: 50 x 10.
