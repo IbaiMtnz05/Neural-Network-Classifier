@@ -42,7 +42,11 @@ void view_mnist_images(double **data, int num_images);
 static double **data;
 int data_nrows;
 int data_ncols = 784;
+<<<<<<< HEAD
 char *my_path = "/workspaces/Trabajo5"; // Consider using relative path or env variable
+=======
+char *my_path = "/workspaces/Trabajo5";
+>>>>>>> 07bc4c4b5b7912b01a474230d680a9087649f968
 
 int seed = 3;
 // Weight matrices dimensions (as given):
