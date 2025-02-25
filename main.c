@@ -6,8 +6,9 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <errno.h>
-#include <unistd.h> // for sleep
+#include <unistd.h> // For getcwd
 #include <SDL2/SDL.h> // Para la visualización
+
 
 // Definición de constantes para el visualizador
 #define WINDOW_WIDTH 560  // 28*20
@@ -42,7 +43,7 @@ void view_mnist_images(double **data, int num_images);
 static double **data;
 int data_nrows;
 int data_ncols = 784;
-char *my_path = "/workspaces/Trabajo5"; // TO DO auto detection
+char *my_path; // TO DO auto detection
 int seed = 3;
 // Weight matrices dimensions (as given):
 // mat1: 784 x 200, mat2: 200 x 100, mat3: 100 x 50, mat4: 50 x 10.
@@ -633,14 +634,14 @@ double final_result(int *predictions, double *actual_digits, int num_samples) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        printf("El programa debe tener un único argumento, la cantidad de procesos que se van a generar\n");
+        printf("El programa debe tener dos argumentos, la cantidad de procesos que se van a generar\n");
         exit(1);
     }
     
     // Use a smaller dataset size for testing if full dataset has issues
     // For full MNIST, this would be 60000. Using smaller size for testing.
     data_nrows = 60000; // Start with a smaller subset for testing
-    
+    char *my_path = getcwd(NULL, 0);
     // Verify path and adjust if needed
     struct {
         const char* path;
