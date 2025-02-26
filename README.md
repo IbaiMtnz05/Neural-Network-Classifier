@@ -1,3 +1,6 @@
 # Trabajo5
 > [!NOTE]  
-> Highlights information that users should take into account, even when skimming.
+> Proyecto no acabado
+
+> [!IMPORTANT]
+> No usa paralelizacion, pero hay que llamarlo con un argumento ./main 1
