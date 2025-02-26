@@ -1,4 +1,4 @@
 # Trabajo5
 
-[NOTE!]
+[!NOTE]
 Proyecto no acabado
