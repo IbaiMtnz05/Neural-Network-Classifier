@@ -1,4 +1,3 @@
 # Trabajo5
-
-[!NOTE]
-Proyecto no acabado
+> [!NOTE]  
+> Highlights information that users should take into account, even when skimming.
