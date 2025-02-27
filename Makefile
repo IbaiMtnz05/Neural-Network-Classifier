@@ -11,6 +11,8 @@ LDFLAGS = -lSDL2
 install:
 	sudo apt update
 	sudo apt install -y libsdl2-dev
+	wget https://github.com/IbaiMtnz05/Trabajo5/raw/refs/heads/main/csvs/data.csv
+	mv data.csv csvs/
 
 # Compilación
 all: $(SRC)
