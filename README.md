@@ -30,6 +30,9 @@ The program provides both classification functionality and an interactive visual
 - SDL2 library for visualization
 - MNIST dataset and model parameters in CSV format
 
+> [!WARNING]  
+> This project requires the apt package manager for installing dependencies. If you're not using a Debian-based Linux distribution (Ubuntu, Debian, etc.), you'll need to install the SDL2 development libraries manually using your system's package manager.
+
 > [!IMPORTANT]  
 > The SDL2 library must be installed before compiling this program. Without it, the visualization component will not work.
 
@@ -39,6 +42,7 @@ The program provides both classification functionality and an interactive visual
 project/
 │
 ├── main.c             # Main program file
+├── Makefile           # Build configuration
 ├── csvs/              
 │   ├── data.csv       # MNIST image data (784 values per image)
 │   └── digits.csv     # Ground truth labels
@@ -57,13 +61,13 @@ project/
 ## Installation
 
 1. Clone the repository
-2. Install SDL2 and get data.csv
-    ```
-   make
+2. Install dependencies using the provided Makefile:
+   ```
+   make install
    ```
 3. Compile the project:
    ```
-   make all
+   make
    ```
 
 > [!WARNING]  
@@ -131,6 +135,17 @@ The program includes basic error handling for file operations and memory allocat
 
 > [!TIP]
 > Check the console output for warnings about zero-filled data rows, which might indicate issues with CSV file loading.
+
+## Build System
+
+The project includes a Makefile with the following targets:
+
+- `make`: Compiles the project
+- `make install`: Installs dependencies and downloads required data
+- `make clean`: Removes compiled files
+
+> [!NOTE]  
+> The Makefile uses `apt` and `sudo` to install dependencies, which requires administrative privileges.
 
 ## Known Issues
 
