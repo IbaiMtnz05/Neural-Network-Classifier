@@ -158,10 +158,7 @@ The project includes a Makefile with the following targets:
 ## Future Improvements
 
 - Implement parallelization for faster processing
-- Add batch processing capability
-- Improve error handling and data validation
-- Add command-line options for dataset selection
-- Implement softmax activation in the output layer
+- Add dynamic memory allocations
 
 > [!NOTE]  
 > This project is a work in progress.
