@@ -632,6 +632,43 @@ double final_result(int *predictions, double *actual_digits, int num_samples) {
     return (correct_predictions / (double)num_samples) * 100.0;
 }
 
+double error_log(int *predictions, double *actual_digits, int num_samples, int max_errors_to_log) {
+    int total_errors = 0;
+    int logged_errors = 0;
+    
+    printf("\n=== Error Log: Model Prediction Failures ===\n");
+    printf("Format: [Line Number] Predicted: X, Actual: Y\n");
+    printf("----------------------------------------\n");
+    
+    // Count errors and log details for misclassified samples
+    for (int i = 0; i < num_samples; i++) {
+        if (predictions[i] != (int)actual_digits[i]) {
+            total_errors++;
+            
+            // Log error details (up to max_errors_to_log)
+            if (logged_errors < max_errors_to_log) {
+                printf("[Line %5d] Predicted: %d, Actual: %.0f\n", 
+                       i + 1,  // Line number (1-indexed for user readability)
+                       predictions[i],  // Model's prediction
+                       actual_digits[i]);  // Actual digit
+                logged_errors++;
+            }
+        }
+    }
+    
+    // If there are more errors than we logged, indicate that
+    if (total_errors > logged_errors) {
+        printf("... and %d more errors not shown\n", total_errors - logged_errors);
+    }
+    
+    // Calculate and return error rate
+    double error_rate = (total_errors / (double)num_samples) * 100.0;
+    printf("\nSummary: %d errors out of %d samples (%.2f%% error rate)\n", 
+           total_errors, num_samples, error_rate);
+    
+    return error_rate;
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         printf("El programa debe tener dos argumentos, la cantidad de procesos que se van a generar\n");
@@ -712,6 +749,7 @@ int main(int argc, char *argv[]) {
 
     double accuracy = final_result(predictions, digits, data_nrows);
     printf("\nFinal Prediction Accuracy: %.2f%%\n", accuracy);
+    error_log(predictions, digits, data_nrows, 1000);
     free(predictions);
     unload_data();
     return 0;
