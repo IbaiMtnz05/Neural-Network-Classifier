@@ -140,7 +140,7 @@ The program includes basic error handling for file operations and memory allocat
 
 The project includes a Makefile with the following targets:
 
-- `make`: Compiles the project
+- `make all`: Compiles the project
 - `make install`: Installs dependencies and downloads required data
 - `make clean`: Removes compiled files
 
@@ -159,6 +159,7 @@ The project includes a Makefile with the following targets:
 
 - Implement parallelization for faster processing
 - Add dynamic memory allocations
+- Calculate the time of operations
 
 > [!NOTE]  
 > This project is a work in progress.
