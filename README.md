@@ -23,6 +23,7 @@ The program provides both classification functionality and an interactive visual
 - Interactive visualization of MNIST images with SDL2
 - Forward pass implementation for neural network inference
 - Accuracy evaluation comparing predictions against ground truth
+- Time measurement in an elegant ascii table
 
 ## Requirements
 
@@ -110,6 +111,7 @@ The neural network implementation follows a standard feedforward architecture wi
 - `forward_pass()`: Performs inference through the neural network
 - `view_mnist_images()`: Interactive SDL2-based image viewer
 - `final_result()`: Calculates classification accuracy
+- `print_timing()`: Calculates the execution time for key functions
 
 ### Matrix Operations
 
