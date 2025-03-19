@@ -160,8 +160,7 @@ The project includes a Makefile with the following targets:
 ## Future Improvements
 
 - Implement parallelization for faster processing
-- Add dynamic memory allocations
-- Calculate the time of operations
+- Add more dynamic memory allocations
 
 > [!NOTE]  
 > This project is a work in progress.

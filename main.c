@@ -7,15 +7,15 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <unistd.h> // For getcwd
-#include <SDL2/SDL.h> // Para la visualización
+#include <SDL2/SDL.h> // For visualization
 #include <time.h>
 
-// Definición de constantes para el visualizador
+// SDL2 windows size definition
 #define WINDOW_WIDTH 560  // 28*20
 #define WINDOW_HEIGHT 560 // 28*20
-#define PIXEL_SIZE 20     // Cada pixel MNIST se mostrará como un cuadrado de 20x20
+#define PIXEL_SIZE 20     // Each MNIST pixel tamain 20x20
 
-// Estructura para el visualizador
+// Visualizer struct definition
 typedef struct {
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -23,7 +23,7 @@ typedef struct {
     int running;
 } Viewer;
 
-// Add this structure after the existing typedefs
+// Time measurement struct
 typedef struct {
     clock_t start;
     clock_t end;
@@ -52,7 +52,7 @@ double error_log(int *predictions, double *actual_digits, int num_samples, int m
 static double **data;
 int data_nrows;
 int data_ncols = 784;
-char *my_path; // TO DO auto detection
+char *my_path;
 int seed = 3;
 // Weight matrices dimensions (as given):
 // mat1: 784 x 200, mat2: 200 x 100, mat3: 100 x 50, mat4: 50 x 10.
@@ -73,27 +73,27 @@ static double *vec2;
 static double *vec3;
 static double *vec4;
 
-// Función para visualizar las imágenes MNIST
+// Function to visualize MNIST images
 void view_mnist_images(double **data, int num_images) {
     if (data == NULL || num_images <= 0) {
-        fprintf(stderr, "Error: Datos no válidos para visualizar\n");
+        fprintf(stderr, "Error: Invalid data for visualization\n");
         return;
     }
     
-    // Inicializar SDL
+    // SDL Startup
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        fprintf(stderr, "Error al inicializar SDL: %s\n", SDL_GetError());
+        fprintf(stderr, "Error initializing SDL: %s\n", SDL_GetError());
         return;
     }
     
-    // Crear estructura del visualizador
+    // Create viewer structure
     Viewer viewer;
     viewer.current_image = 0;
     viewer.running = 1;
     
-    // Crear ventana
+    // Create window
     viewer.window = SDL_CreateWindow(
-        "Visualizador MNIST",
+        "MNIST Viewer",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         WINDOW_WIDTH,
@@ -102,12 +102,12 @@ void view_mnist_images(double **data, int num_images) {
     );
     
     if (!viewer.window) {
-        fprintf(stderr, "Error al crear ventana: %s\n", SDL_GetError());
+        fprintf(stderr, "Error creating window: %s\n", SDL_GetError());
         SDL_Quit();
         return;
     }
     
-    // Crear renderer
+    // Create renderer
     viewer.renderer = SDL_CreateRenderer(
         viewer.window,
         -1,
@@ -115,16 +115,16 @@ void view_mnist_images(double **data, int num_images) {
     );
     
     if (!viewer.renderer) {
-        fprintf(stderr, "Error al crear renderer: %s\n", SDL_GetError());
+        fprintf(stderr, "Error creating renderer: %s\n", SDL_GetError());
         SDL_DestroyWindow(viewer.window);
         SDL_Quit();
         return;
     }
     
-    // Bucle principal
+    // Main loop
     SDL_Event event;
     while (viewer.running) {
-        // Procesar eventos
+        // Process events
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
                 case SDL_QUIT:
@@ -132,13 +132,13 @@ void view_mnist_images(double **data, int num_images) {
                     break;
                 case SDL_KEYDOWN:
                     switch (event.key.keysym.sym) {
-                        case SDLK_RIGHT: // Flecha derecha - siguiente imagen
+                        case SDLK_RIGHT: // Right arrow - next image
                             viewer.current_image = (viewer.current_image + 1) % num_images;
                             break;
-                        case SDLK_LEFT: // Flecha izquierda - imagen anterior
+                        case SDLK_LEFT: // Left arrow - previous image
                             viewer.current_image = (viewer.current_image - 1 + num_images) % num_images;
                             break;
-                        case SDLK_ESCAPE: // Escape - salir
+                        case SDLK_ESCAPE: // Escape - exit
                             viewer.running = 0;
                             break;
                         default:
@@ -148,22 +148,22 @@ void view_mnist_images(double **data, int num_images) {
             }
         }
         
-        // Limpiar pantalla
+        // Clear screen
         SDL_SetRenderDrawColor(viewer.renderer, 0, 0, 0, 255);
         SDL_RenderClear(viewer.renderer);
         
-        // Renderizar imagen actual
+        // Render current image
         double *current_data = data[viewer.current_image];
         for (int i = 0; i < 28; i++) {
             for (int j = 0; j < 28; j++) {
                 int index = i * 28 + j;
-                // El valor está en el rango [0, 255], donde 0 es negro y 255 es blanco
+                // Value is in range [0, 255], where 0 is black and 255 is white
                 int pixel_value = (int)(current_data[index]);
                 
-                // Configurar color (escala de grises)
+                // Set color (grayscale)
                 SDL_SetRenderDrawColor(viewer.renderer, pixel_value, pixel_value, pixel_value, 255);
                 
-                // Dibujar píxel ampliado
+                // Draw enlarged pixel
                 SDL_Rect rect = {
                     j * PIXEL_SIZE,
                     i * PIXEL_SIZE,
@@ -174,19 +174,19 @@ void view_mnist_images(double **data, int num_images) {
             }
         }
         
-        // Mostrar información de imagen actual
+        // Show current image information
         char info_text[100];
-        sprintf(info_text, "Imagen %d/%d - Use flechas izq/der para navegar, ESC para salir", 
+        sprintf(info_text, "Image %d/%d - Use left/right arrows to navigate, ESC to exit", 
                 viewer.current_image + 1, num_images);
         
-        // Renderizar en pantalla
+        // Render to screen
         SDL_RenderPresent(viewer.renderer);
         
-        // Pequeña pausa para no consumir demasiada CPU
+        // Small delay to avoid excessive CPU usage
         SDL_Delay(10);
     }
     
-    // Liberar recursos
+    // Free resources
     SDL_DestroyRenderer(viewer.renderer);
     SDL_DestroyWindow(viewer.window);
     SDL_Quit();
@@ -213,7 +213,7 @@ void debug_print_vector(double *vec, int nrows, const char *name) {
     printf("\n");
 }
 
-// Helper for tokenization - FIXED to better handle CSV parsing
+// Helper for tokenization
 char *siguiente_token(char *buffer) {
     static char *last_ptr = NULL;
     if (buffer != NULL) {
@@ -224,7 +224,7 @@ char *siguiente_token(char *buffer) {
     }
 }
 
-// Read a CSV file into a 2D matrix - FIXED to handle different CSV formats
+// Read a CSV file into a 2D matrix
 int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
     printf("\nRead matrix from file: %s\n", file);
     char buffer[1024 * 10]; // Increased buffer size for larger lines
@@ -257,7 +257,7 @@ int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
                 token = siguiente_token(NULL);
             } else {
                 printf("Warning: Missing value at row %d, col %d\n", row, col);
-                mat[row][col] = 0.0; // Use 0 instead of -1 for missing values
+                mat[row][col] = 0.0;
             }
         }
     }
@@ -265,7 +265,7 @@ int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
     return 0;
 }
 
-// Read a CSV file into a vector - FIXED to handle different CSV formats
+// Read a CSV file into a vector
 int read_vector(double *vect, char *file, int nrows) {
     printf("\nRead vector from file: %s\n", file);
     FILE *fstream = fopen(file, "r");
@@ -302,10 +302,10 @@ int read_vector(double *vect, char *file, int nrows) {
 
 void print_matrix(double **mat, int nrows, int ncols, int offset_row, int offset_col) {
     if (!mat) {
-        printf("Error: La matriz no está inicializada.\n");
+        printf("Error: The matrix is not initialized.\n");
         return;
     }
-    printf("\nMatriz (%d x %d) desde offset (%d, %d):\n", nrows, ncols, offset_row, offset_col);
+    printf("\nMatrix (%d x %d) from offset (%d, %d):\n", nrows, ncols, offset_row, offset_col);
     for (int row = 0; row < nrows; row++) {
         for (int col = 0; col < ncols; col++) {
             printf("%8.3f ", mat[row + offset_row][col + offset_col]);
@@ -314,16 +314,16 @@ void print_matrix(double **mat, int nrows, int ncols, int offset_row, int offset
     }
 }
 
-// Load all data and model parameters - FIXED to better handle file loading
+// Load all data and model parameters
 void load_data(char *path) {
     // Allocate buffer for file paths.
     str = malloc(256); // Increased buffer size for longer paths
     
-    // Load digits (the ground-truth labels)
-    printf("Cargando digits...\n");
+    // Load digits
+    printf("Loading digits...\n");
     digits = malloc(data_nrows * sizeof(double));
     if (!digits) {
-        fprintf(stderr, "Error: No se pudo asignar memoria para digits\n");
+        fprintf(stderr, "Error: Could not allocate memory for digits\n");
         exit(1);
     }
     
@@ -334,23 +334,23 @@ void load_data(char *path) {
     
     sprintf(str, "%scsvs/digits.csv", path);
     if (read_vector(digits, str, data_nrows) != 0) {
-        fprintf(stderr, "Error: No se pudieron cargar los digits\n");
+        fprintf(stderr, "Error: Could not load digits\n");
         exit(1);
     }
-    printf("Digits cargados.\n");
+    printf("Digits loaded.\n");
 
     // Allocate and load input data (as a 2D array).
-    printf("Cargando data...\n");
+    printf("Loading data...\n");
     data = malloc(data_nrows * sizeof(double *));
     if (!data) {
-        fprintf(stderr, "Error: No se pudo asignar memoria para data\n");
+        fprintf(stderr, "Error: Could not allocate memory for data\n");
         exit(1);
     }
     
     for (int i = 0; i < data_nrows; i++) {
         data[i] = malloc(data_ncols * sizeof(double));
         if (!data[i]) {
-            fprintf(stderr, "Error: No se pudo asignar memoria para data[%d]\n", i);
+            fprintf(stderr, "Error: Could not allocate memory for data[%d]\n", i);
             exit(1);
         }
         // Initialize with zeros to detect loading issues
@@ -361,11 +361,11 @@ void load_data(char *path) {
     
     sprintf(str, "%scsvs/data.csv", path);
     if (read_matrix(data, str, data_nrows, data_ncols, 1) != 0) {
-        fprintf(stderr, "Error: No se pudo cargar data.csv\n");
+        fprintf(stderr, "Error: Could not load data.csv\n");
         exit(1);
     }
     
-    printf("Data cargada.\n");
+    printf("Data loaded.\n");
     print_matrix(data, 5, 5, 0, 0);
     
     // Check if data is loaded correctly by examining a few values
@@ -380,12 +380,12 @@ void load_data(char *path) {
         if (has_nonzero) break;
     }
     if (!has_nonzero) {
-        printf("Warning: La data parece contener solo ceros. Verificar el formato del archivo CSV\n");
+        printf("Warning: The data seems to contain only zeros. Check the CSV file format\n");
     }
     
     // Load weight matrices.
     // mat1: 784 x 200
-    printf("Cargando mat1...\n");
+    printf("Loading mat1...\n");
     mat1 = malloc(matrices_rows[0] * sizeof(double *));
     for (int i = 0; i < matrices_rows[0]; i++) {
         mat1[i] = malloc(matrices_columns[0] * sizeof(double));
@@ -395,10 +395,10 @@ void load_data(char *path) {
     }
     sprintf(str, "%sparameters/weights%d_%d.csv", path, 0, seed);
     read_matrix(mat1, str, matrices_rows[0], matrices_columns[0], 1);
-    printf("mat1 cargada.\n");
+    printf("mat1 loaded.\n");
 
     // mat2: 200 x 100
-    printf("Cargando mat2...\n");
+    printf("Loading mat2...\n");
     mat2 = malloc(matrices_rows[1] * sizeof(double *));
     for (int i = 0; i < matrices_rows[1]; i++) {
         mat2[i] = malloc(matrices_columns[1] * sizeof(double));
@@ -408,10 +408,10 @@ void load_data(char *path) {
     }
     sprintf(str, "%sparameters/weights%d_%d.csv", path, 1, seed);
     read_matrix(mat2, str, matrices_rows[1], matrices_columns[1], 1);
-    printf("mat2 cargada.\n");
+    printf("mat2 loaded.\n");
 
     // mat3: 100 x 50
-    printf("Cargando mat3...\n");
+    printf("Loading mat3...\n");
     mat3 = malloc(matrices_rows[2] * sizeof(double *));
     for (int i = 0; i < matrices_rows[2]; i++) {
         mat3[i] = malloc(matrices_columns[2] * sizeof(double));
@@ -421,10 +421,10 @@ void load_data(char *path) {
     }
     sprintf(str, "%sparameters/weights%d_%d.csv", path, 2, seed);
     read_matrix(mat3, str, matrices_rows[2], matrices_columns[2], 1);
-    printf("mat3 cargada.\n");
+    printf("mat3 loaded.\n");
     
     // mat4: 50 x 10
-    printf("Cargando mat4...\n");
+    printf("Loading mat4...\n");
     mat4 = malloc(matrices_rows[3] * sizeof(double *));
     for (int i = 0; i < matrices_rows[3]; i++) {
         mat4[i] = malloc(matrices_columns[3] * sizeof(double));
@@ -434,7 +434,7 @@ void load_data(char *path) {
     }
     sprintf(str, "%sparameters/weights%d_%d.csv", path, 3, seed);
     read_matrix(mat4, str, matrices_rows[3], matrices_columns[3], 1);
-    printf("mat4 cargada.\n");
+    printf("mat4 loaded.\n");
 
     // Load bias vectors.
     // vec1: dimension 200
@@ -444,7 +444,7 @@ void load_data(char *path) {
     }
     sprintf(str, "%sparameters/biases%d_%d.csv", path, 0, seed);
     read_vector(vec1, str, vector_rows[0]);
-    printf("vec1 cargada.\n");
+    printf("vec1 loaded.\n");
 
     // vec2: dimension 100
     vec2 = malloc(vector_rows[1] * sizeof(double));
@@ -453,7 +453,7 @@ void load_data(char *path) {
     }
     sprintf(str, "%sparameters/biases%d_%d.csv", path, 1, seed);
     read_vector(vec2, str, vector_rows[1]);
-    printf("vec2 cargada.\n");
+    printf("vec2 loaded.\n");
 
     // vec3: dimension 50
     vec3 = malloc(vector_rows[2] * sizeof(double));
@@ -462,8 +462,8 @@ void load_data(char *path) {
     }
     sprintf(str, "%sparameters/biases%d_%d.csv", path, 2, seed);
     read_vector(vec3, str, vector_rows[2]);
-    printf("vec3 cargada.\n");
-    debug_print_vector(vec3, vector_rows[2], "vec3");
+    printf("vec3 loaded.\n");
+    // debug_print_vector(vec3, vector_rows[2], "vec3");
 
     // vec4: dimension 10
     vec4 = malloc(vector_rows[3] * sizeof(double));
@@ -472,8 +472,8 @@ void load_data(char *path) {
     }
     sprintf(str, "%sparameters/biases%d_%d.csv", path, 3, seed);
     read_vector(vec4, str, vector_rows[3]);
-    printf("vec4 cargada.\n");
-    debug_print_vector(vec4, vector_rows[3], "vec4");
+    printf("vec4 loaded.\n");
+    // debug_print_vector(vec4, vector_rows[3], "vec4");
 }
 
 // Free all allocated memory.
@@ -494,7 +494,7 @@ void unload_data() {
     free(str);
 }
 
-void print(void *arg) { printf("Hola, soy %d\n", *(int *)arg); }
+void print(void *arg) { printf("Hello, I am %d\n", *(int *)arg); }
 
 // Matrix multiplication:
 // - input: (input_rows x input_cols)
@@ -622,10 +622,10 @@ int control_errores(const char *checkFile) {
     if (f == NULL) {
         printf("errno: %d\n", errno);
         printf("Error: %s\n", strerror(errno));
-        perror("Houston, tenemos un problema");
+        perror("Houston, we have a problem");
         return 1;
     }
-    printf("No tenemos problemas con el archivo: %s\n", checkFile);
+    printf("No problems with the file: %s\n", checkFile);
     fclose(f);
     return 0;
 }
@@ -704,10 +704,10 @@ void print_timing_footer() {
     printf("└─────────────────────────────────────┴───────────────┘\n");
 }
 
-// Modify main() function:
+// main() function:
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        printf("El programa debe tener al menos dos argumentos, la cantidad de procesos que se van a generar o el modo de ejecucion\n");
+        printf("The program must have at least two arguments, the number of processes to generate or the execution mode\n");
         exit(1);
     }
 
@@ -717,7 +717,7 @@ int main(int argc, char *argv[]) {
     
     // Use a smaller dataset size for testing if full dataset has issues
     // For full MNIST, this would be 60000. Using smaller size for testing.
-    data_nrows = 10000; // Start with a smaller subset for testing
+    data_nrows = 60000; // Start with a smaller subset for testing
     char *my_path = getcwd(NULL, 0);
     // Verify path and adjust if needed
     struct {
@@ -746,8 +746,8 @@ int main(int argc, char *argv[]) {
     }
     
     if (!path_found) {
-        printf("No se ha encontrado el archivo data.csv en ninguna de las rutas probadas.\n");
-        printf("Por favor, especifique la ruta correcta en la variable 'my_path'.\n");
+        printf("The data.csv file was not found in any of the tested paths.\n");
+        printf("Please specify the correct path in the 'my_path' variable.\n");
         return 1;
     }
     
@@ -756,7 +756,7 @@ int main(int argc, char *argv[]) {
     load_data(my_path);
     end_timing(&timings[timing_index++]);
     
-    // Verifiquemos si los datos se cargaron correctamente
+    // Verify if the data was loaded correctly
     int datos_validos = 1;
     for (int i = 0; i < 10 && i < data_nrows; i++) {
         int zeros_count = 0;
@@ -764,24 +764,24 @@ int main(int argc, char *argv[]) {
             if (data[i][j] == 0) zeros_count++;
         }
         if (zeros_count == data_ncols) {
-            printf("Warning: La fila %d contiene solo ceros.\n", i);
+            printf("Warning: Row %d contains only zeros.\n", i);
             datos_validos = 0;
         }
     }
     
     if (!datos_validos) {
-        printf("Warning: Posible problema con la lectura de data.csv. Revise el formato del archivo.\n");
+        printf("Warning: Possible issue with reading data.csv. Check the file format.\n");
     }
     
     // Time the MNIST viewer
     start_timing(&timings[timing_index], "MNIST Viewing time");
-    // Mostrar el visualizador de imágenes MNIST
-    printf("\n=== Iniciando Visualizador de Imágenes MNIST ===\n");
-    printf("Use las flechas izquierda/derecha para navegar entre imágenes\n");
-    printf("Presione ESC para cerrar el visualizador y continuar con el programa\n");
+    // Show the MNIST image viewer
+    printf("\n=== Starting MNIST Image Viewer ===\n");
+    printf("Use the left/right arrows to navigate between images\n");
+    printf("Press ESC to close the viewer and continue with the program\n");
     view_mnist_images(data, data_nrows);
     end_timing(&timings[timing_index++]);
-    printf("\n=== Visualizador cerrado, continuando con el programa ===\n");
+    printf("\n=== Viewer closed, continuing with the program ===\n");
     
     // Time the forward pass
     start_timing(&timings[timing_index], "Forward Pass");
