@@ -717,7 +717,7 @@ int main(int argc, char *argv[]) {
     
     // Use a smaller dataset size for testing if full dataset has issues
     // For full MNIST, this would be 60000. Using smaller size for testing.
-    data_nrows = 10000; // Start with a smaller subset for testing
+    data_nrows = 60000; // Start with a smaller subset for testing
     char *my_path = getcwd(NULL, 0);
     // Verify path and adjust if needed
     struct {
