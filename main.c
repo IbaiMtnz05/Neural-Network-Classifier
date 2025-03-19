@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <unistd.h> // For getcwd
 #include <SDL2/SDL.h> // Para la visualización
-
+#include <time.h>
 
 // Definición de constantes para el visualizador
 #define WINDOW_WIDTH 560  // 28*20
@@ -22,6 +22,14 @@ typedef struct {
     int current_image;
     int running;
 } Viewer;
+
+// Add this structure after the existing typedefs
+typedef struct {
+    clock_t start;
+    clock_t end;
+    double cpu_time;
+    const char* operation;
+} TimingInfo;
 
 // Function prototypes
 int control_errores(const char *checkFile);
@@ -38,6 +46,7 @@ void free_matrix(double **matrix, int rows);
 int* forward_pass(double **data);
 char *siguiente_token(char *buffer);
 void view_mnist_images(double **data, int num_images);
+double error_log(int *predictions, double *actual_digits, int num_samples, int max_errors_to_log);
 
 // Global variables
 static double **data;
@@ -219,6 +228,7 @@ char *siguiente_token(char *buffer) {
 int read_matrix(double **mat, char *file, int nrows, int ncols, int fac) {
     printf("\nRead matrix from file: %s\n", file);
     char buffer[1024 * 10]; // Increased buffer size for larger lines
+    //char *buffer =(double*) malloc(ncols*nrows * sizeof(double)); // Malloc pero no funciona
     FILE *fstream = fopen(file, "r");
     if (fstream == NULL || control_errores(file) != 0) {
         printf("Error opening file: %s\n", file);
@@ -669,15 +679,45 @@ double error_log(int *predictions, double *actual_digits, int num_samples, int m
     return error_rate;
 }
 
+// Add these functions before main()
+void start_timing(TimingInfo* timing, const char* operation) {
+    timing->operation = operation;
+    timing->start = clock();
+}
+
+void end_timing(TimingInfo* timing) {
+    timing->end = clock();
+    timing->cpu_time = ((double) (timing->end - timing->start)) / CLOCKS_PER_SEC;
+}
+
+void print_timing(TimingInfo* timing) {
+    printf("│ %-36s│ %11.4f s │\n", timing->operation, timing->cpu_time);
+}
+
+void print_timing_header() {
+    printf("┌─────────────────────────────────────┬───────────────┐\n");
+    printf("│ Operation                           │   Time (s)    │\n");
+    printf("├─────────────────────────────────────┼───────────────┤\n");
+}
+
+void print_timing_footer() {
+    printf("└─────────────────────────────────────┴───────────────┘\n");
+}
+
+// Modify main() function:
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("El programa debe tener dos argumentos, la cantidad de procesos que se van a generar\n");
+    if (argc < 2) {
+        printf("El programa debe tener al menos dos argumentos, la cantidad de procesos que se van a generar o el modo de ejecucion\n");
         exit(1);
     }
+
+    TimingInfo timings[10];  // Array to store timing information
+    int timing_index = 0;
+    double total_time = 0.0;
     
     // Use a smaller dataset size for testing if full dataset has issues
     // For full MNIST, this would be 60000. Using smaller size for testing.
-    data_nrows = 60000; // Start with a smaller subset for testing
+    data_nrows = 10000; // Start with a smaller subset for testing
     char *my_path = getcwd(NULL, 0);
     // Verify path and adjust if needed
     struct {
@@ -711,8 +751,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    // Cargar los datos primero (necesario para visualizar)
+    // Start timing data loading
+    start_timing(&timings[timing_index], "Data Loading");
     load_data(my_path);
+    end_timing(&timings[timing_index++]);
     
     // Verifiquemos si los datos se cargaron correctamente
     int datos_validos = 1;
@@ -731,16 +773,23 @@ int main(int argc, char *argv[]) {
         printf("Warning: Posible problema con la lectura de data.csv. Revise el formato del archivo.\n");
     }
     
+    // Time the MNIST viewer
+    start_timing(&timings[timing_index], "MNIST Viewing time");
     // Mostrar el visualizador de imágenes MNIST
     printf("\n=== Iniciando Visualizador de Imágenes MNIST ===\n");
     printf("Use las flechas izquierda/derecha para navegar entre imágenes\n");
     printf("Presione ESC para cerrar el visualizador y continuar con el programa\n");
     view_mnist_images(data, data_nrows);
+    end_timing(&timings[timing_index++]);
     printf("\n=== Visualizador cerrado, continuando con el programa ===\n");
     
-    // Continuar con el proceso normal una vez que se cierra el visualizador
+    // Time the forward pass
+    start_timing(&timings[timing_index], "Forward Pass");
     int *predictions = forward_pass(data);
+    end_timing(&timings[timing_index++]);
     
+    // Time the accuracy calculation
+    start_timing(&timings[timing_index], "Accuracy Calculation");
     // Compare the first 10 predictions with the actual digits.
     printf("\nComparing first 100 predictions with actual digits:\n");
     for (int i = 0; i < 100 && i < data_nrows; i++) {
@@ -750,6 +799,24 @@ int main(int argc, char *argv[]) {
     double accuracy = final_result(predictions, digits, data_nrows);
     printf("\nFinal Prediction Accuracy: %.2f%%\n", accuracy);
     error_log(predictions, digits, data_nrows, 1000);
+    end_timing(&timings[timing_index++]);
+    
+    // Print timing results
+    printf("\n=== Performance Measurements ===\n");
+    print_timing_header();
+    
+    for (int i = 0; i < timing_index; i++) {
+        print_timing(&timings[i]);
+        total_time += timings[i].cpu_time;
+    }
+    
+    printf("├─────────────────────────────────────┼───────────────┤\n");
+    printf("│ Total Time                          │ %11.4f s │\n", total_time);
+    print_timing_footer();
+    
+    // Print final results
+    printf("\nFinal Prediction Accuracy: %.2f%%\n", accuracy);
+    
     free(predictions);
     unload_data();
     return 0;
