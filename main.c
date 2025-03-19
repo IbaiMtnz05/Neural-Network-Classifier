@@ -13,7 +13,7 @@
 // SDL2 windows size definition
 #define WINDOW_WIDTH 560  // 28*20
 #define WINDOW_HEIGHT 560 // 28*20
-#define PIXEL_SIZE 20     // Each MNIST pixel tamain 20x20
+#define PIXEL_SIZE 20     // Each MNIST pixel size 20x20
 
 // Visualizer struct definition
 typedef struct {
