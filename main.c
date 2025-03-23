@@ -8,6 +8,7 @@
 #include <unistd.h> // For getcwd
 #include <SDL2/SDL.h> // For visualization
 #include <time.h>
+#include <sys/time.h> // Add this include for precise timing
 
 // SDL2 windows size definition
 #define WINDOW_WIDTH 560  // 28*20
@@ -24,9 +25,9 @@ typedef struct {
 
 // Time measurement struct
 typedef struct {
-    clock_t start;
-    clock_t end;
-    double cpu_time;
+    struct timeval start;
+    struct timeval end;
+    double elapsed_time;
     const char* operation;
 } TimingInfo;
 
@@ -55,6 +56,14 @@ int* forward_pass(double **data);
 char *siguiente_token(char *buffer);
 void view_mnist_images(double **data, int num_images);
 double error_log(int *predictions, double *actual_digits, int num_samples, int max_errors_to_log);
+
+// Move these function declarations up with other function prototypes (after TimingInfo struct definition)
+void start_timing(TimingInfo* timing, const char* operation);
+void end_timing(TimingInfo* timing);
+void print_timing(TimingInfo* timing);
+void print_timing_header(void);
+void print_timing_footer(void);
+void measure_thread_time(TimingInfo* timing, int thread_id, const char* event);
 
 // Global variables
 static double **data;
@@ -677,6 +686,9 @@ int* parallel_forward_pass(double **data) {
     int *child_pids = malloc(thread_count * sizeof(int));
     const int STACK_SIZE = 1024*1024; // 1MB per thread
     
+    TimingInfo thread_timing;
+    start_timing(&thread_timing, "Thread Creation");
+    
     for (int i = 0; i < thread_count; i++) {
         stacks[i] = malloc(STACK_SIZE);
         if (!stacks[i]) {
@@ -694,6 +706,8 @@ int* parallel_forward_pass(double **data) {
                             CLONE_VM | SIGCHLD,
                             &td[i]);
         
+        measure_thread_time(&thread_timing, i, "Created");
+        
         if (child_pids[i] == -1) {
             perror("clone");
             exit(1);
@@ -706,8 +720,12 @@ int* parallel_forward_pass(double **data) {
     // Wait for all threads to complete
     for (int i = 0; i < thread_count; i++) {
         waitpid(child_pids[i], NULL, 0);
+        measure_thread_time(&thread_timing, i, "Completed");
         free(stacks[i]);
     }
+    
+    end_timing(&thread_timing);
+    printf("\nTotal thread management time: %.4f seconds\n", thread_timing.elapsed_time);
     
     free(td);
     free(stacks);
@@ -782,16 +800,18 @@ double error_log(int *predictions, double *actual_digits, int num_samples, int m
 // Add these functions before main()
 void start_timing(TimingInfo* timing, const char* operation) {
     timing->operation = operation;
-    timing->start = clock();
+    gettimeofday(&timing->start, NULL);
 }
 
 void end_timing(TimingInfo* timing) {
-    timing->end = clock();
-    timing->cpu_time = ((double) (timing->end - timing->start)) / CLOCKS_PER_SEC;
+    gettimeofday(&timing->end, NULL);
+    timing->elapsed_time = 
+        (timing->end.tv_sec - timing->start.tv_sec) +
+        (timing->end.tv_usec - timing->start.tv_usec) / 1000000.0;
 }
 
 void print_timing(TimingInfo* timing) {
-    printf("│ %-36s│ %11.4f s │\n", timing->operation, timing->cpu_time);
+    printf("│ %-36s│ %11.4f s │\n", timing->operation, timing->elapsed_time);
 }
 
 void print_timing_header() {
@@ -804,11 +824,25 @@ void print_timing_footer() {
     printf("└─────────────────────────────────────┴───────────────┘\n");
 }
 
+// Add a new timing function for thread creation
+void measure_thread_time(TimingInfo* timing, int thread_id, const char* event) {
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+    double elapsed = 
+        (current_time.tv_sec - timing->start.tv_sec) +
+        (current_time.tv_usec - timing->start.tv_usec) / 1000000.0;
+    printf("Thread %d - %s: %.4f seconds\n", thread_id, event, elapsed);
+}
+
 // global variable to hold thread_count extracted from argv
 int thread_count;
  
 // main() function:
 int main(int argc, char *argv[]) {
+    // Add total execution timing at the very start
+    TimingInfo total_execution;
+    start_timing(&total_execution, "Total Execution");
+    
     if (argc < 2) {
         printf("Usage: %s <num_threads>\n", argv[0]);
         exit(1);
@@ -821,7 +855,6 @@ int main(int argc, char *argv[]) {
 
     TimingInfo timings[10];  // Array to store timing information
     int timing_index = 0;
-    double total_time = 0.0;
     
     // Use a smaller dataset size for testing if full dataset has issues
     // For full MNIST, this would be 60000. Using smaller size for testing.
@@ -909,21 +942,22 @@ int main(int argc, char *argv[]) {
     error_log(predictions, digits, data_nrows, 1000);
     end_timing(&timings[timing_index++]);
     
-    // Print timing results
-    printf("\n=== Performance Measurements ===\n");
+    // Print final results
+    printf("\nFinal Prediction Accuracy: %.2f%%\n", accuracy);
+    
+    // Before return, end total timing and print final results
+    end_timing(&total_execution);
+    
+    printf("\n=== Final Performance Measurements ===\n");
     print_timing_header();
     
     for (int i = 0; i < timing_index; i++) {
         print_timing(&timings[i]);
-        total_time += timings[i].cpu_time;
     }
     
     printf("├─────────────────────────────────────┼───────────────┤\n");
-    printf("│ Total Time                          │ %11.4f s │\n", total_time);
+    print_timing(&total_execution);  // Print total execution time
     print_timing_footer();
-    
-    // Print final results
-    printf("\nFinal Prediction Accuracy: %.2f%%\n", accuracy);
     
     free(predictions);
     unload_data();
