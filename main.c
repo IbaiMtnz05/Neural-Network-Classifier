@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
@@ -668,21 +667,17 @@ int thread_forward(void *arg) {
 // New parallel forward pass function using clone()
 // The thread count is read from argv[1].
 int* parallel_forward_pass(double **data) {
-    int num_threads = atoi(*(++(char **)(&data[0]))); // workaround to access argv[1]; 
-      // NOTE: Please adjust how you pass argv to this function; 
-      // for clarity, assume num_threads is set (see main() modification below)
-    // For simplicity, assume you have extracted num_threads from main() (shown later)
-    extern int thread_count; // use a global variable set from main()
-    num_threads = thread_count;
-
+    extern int thread_count;  // Add this line to explicitly use the external variable
+    printf("\n=== Starting Parallel Forward Pass with %d threads ===\n", thread_count);
+    
     int *predictions = malloc(data_nrows * sizeof(int));
-    int rows_per_thread = data_nrows / num_threads;
-    ThreadData *td = malloc(num_threads * sizeof(ThreadData));
-    void **stacks = malloc(num_threads*sizeof(void*));
-    int *child_pids = malloc(num_threads*sizeof(int));
+    int rows_per_thread = data_nrows / thread_count;
+    ThreadData *td = malloc(thread_count * sizeof(ThreadData));
+    void **stacks = malloc(thread_count * sizeof(void*));
+    int *child_pids = malloc(thread_count * sizeof(int));
     const int STACK_SIZE = 1024*1024; // 1MB per thread
     
-    for (int i = 0; i < num_threads; i++) {
+    for (int i = 0; i < thread_count; i++) {
         stacks[i] = malloc(STACK_SIZE);
         if (!stacks[i]) {
             perror("malloc stack");
@@ -690,21 +685,35 @@ int* parallel_forward_pass(double **data) {
         }
         td[i].thread_id = i;
         td[i].start = i * rows_per_thread;
-        td[i].end = (i == num_threads-1) ? data_nrows : (i+1)*rows_per_thread;
+        td[i].end = (i == thread_count-1) ? data_nrows : (i+1)*rows_per_thread;
         td[i].input_data = data;
         td[i].predictions = predictions;
-        child_pids[i] = clone(thread_forward, (char*)stacks[i] + STACK_SIZE, CLONE_VM | SIGCHLD, &td[i]);
+        
+        child_pids[i] = clone(thread_forward, 
+                            (char*)stacks[i] + STACK_SIZE,
+                            CLONE_VM | SIGCHLD,
+                            &td[i]);
+        
         if (child_pids[i] == -1) {
             perror("clone");
             exit(1);
         }
+        
+        printf("Created thread %d handling rows %d to %d\n", 
+               i, td[i].start, td[i].end);
     }
-    // Wait for all threads to complete.
-    for (int i = 0; i < num_threads; i++) {
+    
+    // Wait for all threads to complete
+    for (int i = 0; i < thread_count; i++) {
         waitpid(child_pids[i], NULL, 0);
         free(stacks[i]);
     }
-    free(td); free(stacks); free(child_pids);
+    
+    free(td);
+    free(stacks);
+    free(child_pids);
+    
+    printf("\n=== Parallel Forward Pass Complete ===\n");
     return predictions;
 }
 
@@ -891,7 +900,7 @@ int main(int argc, char *argv[]) {
     start_timing(&timings[timing_index], "Accuracy Calculation");
     // Compare the first 10 predictions with the actual digits.
     printf("\nComparing first 100 predictions with actual digits:\n");
-    for (int i = 0; i < 100 && i < data_nrows; i++) {
+    for (int i = 0; i < 10 && i < data_nrows; i++) {
         printf("Sample %d: Predicted %d, Actual %.0f\n", i, predictions[i], digits[i]);
     }
 

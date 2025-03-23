@@ -8,11 +8,10 @@ SRC = main.c
 LDFLAGS = -lSDL2
 
 # Flags de compilación
-CFLAGS = -O2 -D_GNU_SOURCE
+CFLAGS = -O2 -D_GNU_SOURCE -Wall
 
 # Instalación de dependencias
 install:
-	sudo apt update
 	sudo apt install -y libsdl2-dev
 	wget https://github.com/IbaiMtnz05/Trabajo5/raw/refs/heads/main/csvs/data.csv
 	mv data.csv csvs/
