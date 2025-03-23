@@ -7,6 +7,9 @@ SRC = main.c
 # Librerías
 LDFLAGS = -lSDL2
 
+# Flags de compilación
+CFLAGS = -O2 -D_GNU_SOURCE
+
 # Instalación de dependencias
 install:
 	sudo apt update
@@ -16,7 +19,7 @@ install:
 
 # Compilación
 all: $(SRC)
-	gcc -o $(TARGET) $(SRC) $(LDFLAGS)
+	gcc $(CFLAGS) -o $(TARGET) $(SRC) $(LDFLAGS)
 
 # Limpieza de archivos compilados
 clean:

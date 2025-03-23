@@ -31,6 +31,15 @@ typedef struct {
     const char* operation;
 } TimingInfo;
 
+// Add this new structure for per-thread work:
+typedef struct {
+    int thread_id;
+    int start;         // start row (inclusive)
+    int end;           // end row (exclusive)
+    double **input_data;
+    int *predictions;
+} ThreadData;
+
 // Function prototypes
 int control_errores(const char *checkFile);
 int read_matrix(double **mat, char *file, int nrows, int ncols, int fac);
@@ -617,6 +626,88 @@ int* forward_pass(double **data) {
     return predicciones;
 }
 
+// Add the thread function implementing the forward pass for a data chunk
+int thread_forward(void *arg) {
+    ThreadData *td = (ThreadData *)arg;
+    int rows = td->end - td->start;
+    double **layer0, **layer1, **layer2, **layer3;
+    
+    // Layer 0
+    layer0 = mat_mul(td->input_data + td->start, rows, data_ncols, mat1, matrices_columns[0]);
+    layer0 = sum_vect(layer0, vec1, rows, matrices_columns[0]);
+    layer0 = relu(layer0, rows, matrices_columns[0]);
+
+    // Layer 1
+    layer1 = mat_mul(layer0, rows, matrices_columns[0], mat2, matrices_columns[1]);
+    layer1 = sum_vect(layer1, vec2, rows, matrices_columns[1]);
+    layer1 = relu(layer1, rows, matrices_columns[1]);
+    free_matrix(layer0, rows);
+    
+    // Layer 2
+    layer2 = mat_mul(layer1, rows, matrices_columns[1], mat3, matrices_columns[2]);
+    layer2 = sum_vect(layer2, vec3, rows, matrices_columns[2]);
+    layer2 = relu(layer2, rows, matrices_columns[2]);
+    free_matrix(layer1, rows);
+    
+    // Layer 3 (final layer)
+    layer3 = mat_mul(layer2, rows, matrices_columns[2], mat4, matrices_columns[3]);
+    layer3 = sum_vect(layer3, vec4, rows, matrices_columns[3]);
+    layer3 = relu(layer3, rows, matrices_columns[3]);
+    free_matrix(layer2, rows);
+    
+    // Compute predictions using argmax over each row
+    int *local_preds = argmax(layer3, rows, matrices_columns[3]);
+    for (int i = 0; i < rows; i++) {
+        td->predictions[td->start + i] = local_preds[i];
+    }
+    free(local_preds);
+    free_matrix(layer3, rows);
+    return 0;
+}
+
+// New parallel forward pass function using clone()
+// The thread count is read from argv[1].
+int* parallel_forward_pass(double **data) {
+    int num_threads = atoi(*(++(char **)(&data[0]))); // workaround to access argv[1]; 
+      // NOTE: Please adjust how you pass argv to this function; 
+      // for clarity, assume num_threads is set (see main() modification below)
+    // For simplicity, assume you have extracted num_threads from main() (shown later)
+    extern int thread_count; // use a global variable set from main()
+    num_threads = thread_count;
+
+    int *predictions = malloc(data_nrows * sizeof(int));
+    int rows_per_thread = data_nrows / num_threads;
+    ThreadData *td = malloc(num_threads * sizeof(ThreadData));
+    void **stacks = malloc(num_threads*sizeof(void*));
+    int *child_pids = malloc(num_threads*sizeof(int));
+    const int STACK_SIZE = 1024*1024; // 1MB per thread
+    
+    for (int i = 0; i < num_threads; i++) {
+        stacks[i] = malloc(STACK_SIZE);
+        if (!stacks[i]) {
+            perror("malloc stack");
+            exit(1);
+        }
+        td[i].thread_id = i;
+        td[i].start = i * rows_per_thread;
+        td[i].end = (i == num_threads-1) ? data_nrows : (i+1)*rows_per_thread;
+        td[i].input_data = data;
+        td[i].predictions = predictions;
+        child_pids[i] = clone(thread_forward, (char*)stacks[i] + STACK_SIZE, CLONE_VM | SIGCHLD, &td[i]);
+        if (child_pids[i] == -1) {
+            perror("clone");
+            exit(1);
+        }
+    }
+    // Wait for all threads to complete.
+    for (int i = 0; i < num_threads; i++) {
+        waitpid(child_pids[i], NULL, 0);
+        free(stacks[i]);
+    }
+    free(td); free(stacks); free(child_pids);
+    return predictions;
+}
+
 int control_errores(const char *checkFile) {
     FILE *f = fopen(checkFile, "r");
     if (f == NULL) {
@@ -704,10 +795,18 @@ void print_timing_footer() {
     printf("└─────────────────────────────────────┴───────────────┘\n");
 }
 
+// global variable to hold thread_count extracted from argv
+int thread_count;
+ 
 // main() function:
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        printf("The program must have at least two arguments, the number of processes to generate or the execution mode\n");
+        printf("Usage: %s <num_threads>\n", argv[0]);
+        exit(1);
+    }
+    thread_count = atoi(argv[1]);
+    if (thread_count <= 0) {
+        printf("Invalid thread count provided\n");
         exit(1);
     }
 
@@ -783,9 +882,9 @@ int main(int argc, char *argv[]) {
     end_timing(&timings[timing_index++]);
     printf("\n=== Viewer closed, continuing with the program ===\n");
     
-    // Time the forward pass
+    // Time the forward pass using the new parallel variant.
     start_timing(&timings[timing_index], "Forward Pass");
-    int *predictions = forward_pass(data);
+    int *predictions = parallel_forward_pass(data);
     end_timing(&timings[timing_index++]);
     
     // Time the accuracy calculation

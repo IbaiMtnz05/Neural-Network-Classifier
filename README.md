@@ -24,6 +24,9 @@ The program provides both classification functionality and an interactive visual
 - Forward pass implementation for neural network inference
 - Accuracy evaluation comparing predictions against ground truth
 - Time measurement in an elegant ascii table
+- Parallel processing support using Linux clone() system calls
+- Dynamic workload distribution across multiple threads
+- Concurrent neural network inference
 
 ## Requirements
 
@@ -76,14 +79,22 @@ project/
 
 ## Usage
 
-Run the program with a parameter (currently unused but required):
+Run the program specifying the number of threads to use:
 
+```bash
+./main <num_threads>
 ```
-./main 1
+
+Example to run with 4 threads:
+```bash
+./main 4
 ```
 
 > [!CAUTION]
 > Running the program without a command-line argument will result in an error and program termination.
+
+> [!TIP]
+> The optimal number of threads typically matches your CPU core count. For example, on a quad-core processor, try using 4 threads.
 
 ### Image Viewer Controls
 
@@ -105,6 +116,26 @@ The neural network implementation follows a standard feedforward architecture wi
 4. **Third Hidden Layer**: 50 neurons with ReLU activation
 5. **Output Layer**: 10 neurons (one per digit) with ReLU activation
 
+### Parallelization Architecture
+
+The program implements parallelization using Linux's clone() system call with the following components:
+
+1. **Thread Data Structure**: `ThreadData` manages per-thread work assignment:
+   - Thread ID
+   - Data range (start/end rows)
+   - Input data reference
+   - Predictions array
+
+2. **Work Distribution**: 
+   - Input data is divided into equal chunks
+   - Each thread processes its assigned chunk through all neural network layers
+   - Results are combined into a single predictions array
+
+3. **Thread Management**:
+   - Thread creation using clone() with CLONE_VM flag for shared memory
+   - Synchronization using waitpid()
+   - Proper cleanup of thread resources
+
 ### Key Functions
 
 - `load_data()`: Loads images, labels, and model parameters
@@ -112,6 +143,8 @@ The neural network implementation follows a standard feedforward architecture wi
 - `view_mnist_images()`: Interactive SDL2-based image viewer
 - `final_result()`: Calculates classification accuracy
 - `print_timing()`: Calculates the execution time for key functions
+- `thread_forward()`: Processes a subset of data through all neural network layers
+- `parallel_forward_pass()`: Manages thread creation and work distribution
 
 ### Matrix Operations
 
@@ -122,7 +155,16 @@ The implementation includes custom matrix operation functions:
 - `argmax()`: Find index of maximum value in each row
 
 > [!NOTE]  
+> Matrix operations are automatically parallelized across the assigned data chunks.
+
+> [!NOTE]  
 > All matrix operations are implemented manually without using external libraries.
+
+## Performance Considerations
+
+- Thread count should match available CPU cores for optimal performance
+- Memory usage increases with thread count due to per-thread stack allocation
+- Large datasets benefit more from parallelization than small ones
 
 ## Memory Management
 
@@ -157,10 +199,16 @@ The project includes a Makefile with the following targets:
 > [!WARNING]  
 > The program assumes a specific CSV format for data files. Deviations from this format may cause parsing issues.
 
+> [!IMPORTANT]
+> - Thread count must be specified at runtime
+> - Performance may vary based on system architecture
+
 ## Future Improvements
 
-- Implement parallelization for faster processing
 - Add more dynamic memory allocations
 
 > [!NOTE]  
-> This project is a work in progress.
+> This is a uni project
+
+> [!NOTE]
+> This parallel implementation is optimized for CPU-bound workloads and shared-memory architectures.
