@@ -173,6 +173,9 @@ The program allocates significant memory to hold the MNIST dataset and network p
 > [!CAUTION]
 > Processing the full 60,000 MNIST images requires substantial RAM. Consider reducing `data_nrows` if running on a memory-constrained system.
 
+> [!NOTE]
+> In addition, after each thread completes its forward pass, all per-thread allocated memory is automatically freed.
+
 ## Error Handling
 
 The program includes basic error handling for file operations and memory allocation. It will output informative messages when issues occur.

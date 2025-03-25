@@ -634,42 +634,64 @@ int* forward_pass(double **data) {
     return predicciones;
 }
 
-// Add the thread function implementing the forward pass for a data chunk
+// Updated thread_forward without goto and ensuring all memory is freed
 int thread_forward(void *arg) {
     ThreadData *td = (ThreadData *)arg;
     int rows = td->end - td->start;
-    double **layer0, **layer1, **layer2, **layer3;
-    
+    double **layer0 = NULL, **layer1 = NULL, **layer2 = NULL, **layer3 = NULL;
+    int *local_preds = NULL;
+
     // Layer 0
     layer0 = mat_mul(td->input_data + td->start, rows, data_ncols, mat1, matrices_columns[0]);
+    if (!layer0) return 1;
     layer0 = sum_vect(layer0, vec1, rows, matrices_columns[0]);
     layer0 = relu(layer0, rows, matrices_columns[0]);
 
     // Layer 1
     layer1 = mat_mul(layer0, rows, matrices_columns[0], mat2, matrices_columns[1]);
+    if (!layer1) { 
+        free_matrix(layer0, rows);
+        return 1;
+    }
     layer1 = sum_vect(layer1, vec2, rows, matrices_columns[1]);
     layer1 = relu(layer1, rows, matrices_columns[1]);
     free_matrix(layer0, rows);
-    
+    layer0 = NULL;
+
     // Layer 2
     layer2 = mat_mul(layer1, rows, matrices_columns[1], mat3, matrices_columns[2]);
+    if (!layer2) {
+        free_matrix(layer1, rows);
+        return 1;
+    }
     layer2 = sum_vect(layer2, vec3, rows, matrices_columns[2]);
     layer2 = relu(layer2, rows, matrices_columns[2]);
     free_matrix(layer1, rows);
-    
+    layer1 = NULL;
+
     // Layer 3 (final layer)
     layer3 = mat_mul(layer2, rows, matrices_columns[2], mat4, matrices_columns[3]);
+    if (!layer3) {
+        free_matrix(layer2, rows);
+        return 1;
+    }
     layer3 = sum_vect(layer3, vec4, rows, matrices_columns[3]);
     layer3 = relu(layer3, rows, matrices_columns[3]);
     free_matrix(layer2, rows);
-    
-    // Compute predictions using argmax over each row
-    int *local_preds = argmax(layer3, rows, matrices_columns[3]);
+    layer2 = NULL;
+
+    // Compute predictions using argmax
+    local_preds = argmax(layer3, rows, matrices_columns[3]);
+    if (!local_preds) {
+        free_matrix(layer3, rows);
+        return 1;
+    }
     for (int i = 0; i < rows; i++) {
         td->predictions[td->start + i] = local_preds[i];
     }
     free(local_preds);
     free_matrix(layer3, rows);
+
     return 0;
 }
 
