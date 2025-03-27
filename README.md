@@ -118,7 +118,7 @@ The neural network implementation follows a standard feedforward architecture wi
 
 ### Parallelization Architecture
 
-The program implements parallelization using Linux's clone() system call with the following components:
+The program now implements parallelization using POSIX threads (pthreads) instead of Linux's clone() system call. The implementation includes:
 
 1. **Thread Data Structure**: `ThreadData` manages per-thread work assignment:
    - Thread ID
@@ -126,15 +126,14 @@ The program implements parallelization using Linux's clone() system call with th
    - Input data reference
    - Predictions array
 
-2. **Work Distribution**: 
-   - Input data is divided into equal chunks
-   - Each thread processes its assigned chunk through all neural network layers
-   - Results are combined into a single predictions array
+2. **Work Distribution**:
+   - Input data is divided into equal chunks.
+   - Each thread processes its assigned chunk through all neural network layers using `pthread_create()`.
+   - Results are combined into a single predictions array.
 
 3. **Thread Management**:
-   - Thread creation using clone() with CLONE_VM flag for shared memory
-   - Synchronization using waitpid()
-   - Proper cleanup of thread resources
+   - Threads are created with `pthread_create()` and synchronized using `pthread_join()`.
+   - Proper cleanup of thread resources is performed after execution.
 
 ### Key Functions
 
