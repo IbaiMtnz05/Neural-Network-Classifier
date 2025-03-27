@@ -9,6 +9,7 @@
 #include <SDL2/SDL.h> // For visualization
 #include <time.h>
 #include <sys/time.h> // Add this include for precise timing
+#include <pthread.h> // Add this include for pthreads
 
 // SDL2 windows size definition
 #define WINDOW_WIDTH 560  // 28*20
@@ -695,63 +696,51 @@ int thread_forward(void *arg) {
     return 0;
 }
 
-// New parallel forward pass function using clone()
-// The thread count is read from argv[1].
+// Add thread wrapper for pthreads
+void* thread_forward_wrapper(void* arg) {
+    thread_forward(arg);
+    return NULL;
+}
+
+// Modify parallel_forward_pass to use pthreads
 int* parallel_forward_pass(double **data) {
-    extern int thread_count;  // Add this line to explicitly use the external variable
+    extern int thread_count;
     printf("\n=== Starting Parallel Forward Pass with %d threads ===\n", thread_count);
     
     int *predictions = malloc(data_nrows * sizeof(int));
     int rows_per_thread = data_nrows / thread_count;
     ThreadData *td = malloc(thread_count * sizeof(ThreadData));
-    void **stacks = malloc(thread_count * sizeof(void*));
-    int *child_pids = malloc(thread_count * sizeof(int));
-    const int STACK_SIZE = 1024*1024; // 1MB per thread
-    
+    pthread_t *threads = malloc(thread_count * sizeof(pthread_t));
     TimingInfo thread_timing;
     start_timing(&thread_timing, "Thread Creation");
     
     for (int i = 0; i < thread_count; i++) {
-        stacks[i] = malloc(STACK_SIZE);
-        if (!stacks[i]) {
-            perror("malloc stack");
-            exit(1);
-        }
         td[i].thread_id = i;
         td[i].start = i * rows_per_thread;
         td[i].end = (i == thread_count-1) ? data_nrows : (i+1)*rows_per_thread;
         td[i].input_data = data;
         td[i].predictions = predictions;
         
-        child_pids[i] = clone(thread_forward, 
-                            (char*)stacks[i] + STACK_SIZE,
-                            CLONE_VM | SIGCHLD,
-                            &td[i]);
-        
-        measure_thread_time(&thread_timing, i, "Created");
-        
-        if (child_pids[i] == -1) {
-            perror("clone");
+        int ret = pthread_create(&threads[i], NULL, thread_forward_wrapper, &td[i]);
+        if (ret != 0) {
+            perror("pthread_create");
             exit(1);
         }
-        
+        measure_thread_time(&thread_timing, i, "Created");
         printf("Created thread %d handling rows %d to %d\n", 
                i, td[i].start, td[i].end);
     }
     
-    // Wait for all threads to complete
     for (int i = 0; i < thread_count; i++) {
-        waitpid(child_pids[i], NULL, 0);
+        pthread_join(threads[i], NULL);
         measure_thread_time(&thread_timing, i, "Completed");
-        free(stacks[i]);
     }
     
     end_timing(&thread_timing);
     printf("\nTotal thread management time: %.4f seconds\n", thread_timing.elapsed_time);
     
     free(td);
-    free(stacks);
-    free(child_pids);
+    free(threads);
     
     printf("\n=== Parallel Forward Pass Complete ===\n");
     return predictions;
