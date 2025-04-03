@@ -195,9 +195,6 @@ The project includes a Makefile with the following targets:
 
 ## Known Issues
 
-> [!IMPORTANT]  
-> Currently the program requires a command-line argument (e.g., `./main 1`) even though parallelization is not implemented.
-
 > [!WARNING]  
 > The program assumes a specific CSV format for data files. Deviations from this format may cause parsing issues.
 
