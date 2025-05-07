@@ -71,7 +71,7 @@ project/
    ```
 3. Compile the project:
    ```
-   make
+   make all
    ```
 
 > [!WARNING]  
